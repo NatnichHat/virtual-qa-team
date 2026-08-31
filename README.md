@@ -26,6 +26,21 @@ make help              # every command, with what it is for
 Then put your stories in `docs/stories/REQ001_<name>/US001_<story>.md` — **you write these; no agent
 ever edits them** — and run `/phase1 REQ001`.
 
+**Starting from a Jira ticket instead of writing from scratch?**
+`scripts/import/fetch-jira.py` transcribes one issue into the story template — mechanically, not
+with judgement. It never invents Given/When/Then; if Jira has no clear "Acceptance Criteria"
+section, it leaves that section empty rather than guessing. Everything it could not confidently
+place lands under `## Needs human review` in the written file.
+
+```bash
+cp .env.example .env               # fill in JIRA_SITE / JIRA_EMAIL / JIRA_API_TOKEN
+python3 scripts/import/fetch-jira.py PROJ-123 --dry-run   # preview first, writes nothing
+python3 scripts/import/fetch-jira.py PROJ-123             # writes docs/stories/REQ.../US....md
+```
+
+Resolve every `## Needs human review` item before `/phase1` — the file is yours from the moment
+it's written, exactly as if you'd typed it by hand.
+
 ## The flow
 
 ```
