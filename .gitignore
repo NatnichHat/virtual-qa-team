@@ -1,0 +1,58 @@
+# macOS
+.DS_Store
+
+# Python (Robot Framework, seed scripts, generator scripts)
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+.python-version
+
+# Node (only if the project adds JS tooling)
+node_modules/
+*.log
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Secrets ────────────────────────────────────────────────────────────────
+# Per-environment credentials for the e2e suite live here and are NEVER tracked.
+# environment.yaml (tracked) holds only non-secret config; every secret value is
+# resolved at runtime from these files. See docs/env_matrix.md.
+tests/e2e/config/auth/.env.*
+!tests/e2e/config/auth/.env.example
+.env
+.env.*
+!.env.example
+
+# ── Run artefacts ──────────────────────────────────────────────────────────
+# Robot output trio. Anchored on purpose: a bare `test_results/` would also
+# swallow a stray repo-root results tree created by a wrongly-anchored
+# --outputdir, hiding exactly the misconfiguration it should surface.
+/tests/e2e/test_results/
+
+# Robot dump files at repo root (transient — a bare `robot` run without --outputdir)
+/log.html
+/output.xml
+/report.html
+/playwright-log.txt
+
+# Triage evidence captures (screenshots, response snapshots, curl transcripts).
+# The triage.md verdict IS tracked — the raw megabytes it cites are not.
+/docs/defects/*/artifacts/
+
+# Gate logs are LOCAL DIAGNOSTICS, not committed evidence: every reviewer
+# re-runs the check firsthand rather than reading someone's log file.
+.gate/
+
+# Worktrees
+.worktrees/
+.claude/worktrees/
+
+# Claude Code local settings (machine-specific permission grants)
+.claude/settings.local.json
