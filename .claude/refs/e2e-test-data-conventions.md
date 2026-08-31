@@ -20,7 +20,7 @@ database or object-storage bucket.
 - **Dict key = the exact test case name.** One top-level key per test case in
   `test_data/e2e_baseline.yaml`, matched by the `Prepare Test Data` keyword's `${${TEST_NAME}}`
   lookup (mechanism unchanged — still defined in `e2e-api-conventions.md` §3 /
-  `docs/tech_stack.md`'s `e2e_test_data_prep`). A missing key fails that test with a
+  `docs/test_stack.md`'s `e2e_test_data_prep`). A missing key fails that test with a
   variable-not-found error, never a silent skip.
 - **`input_data` only when there's something to feed in; `expected_data` only when there's
   something to verify.** `input_data` holds whatever a keyword needs to build its call — form
@@ -102,7 +102,7 @@ E2E-REQ012-US045-001 Create Order Happy Path:
 
 `e2e_seed_script`-loaded data (per `e2e-api-conventions.md` §6) is a **prerequisite** — it is loaded
 before the suite runs and is never itself an assertion target (unchanged; see R2 in
-`docs/test-taxonomy.md`). The `database`/`bucket` blocks in this section exist for the **opposite**
+`docs/test_strategy.md`). The `database`/`bucket` blocks in this section exist for the **opposite**
 case: a step in the test case's own flow — the keyword call under test — writes, updates, or
 deletes a database row or a bucket object, and *that resulting state change* is a first-class thing
 the test must verify, exactly as it verifies an API response. A scenario whose action has such a
@@ -147,8 +147,8 @@ library, which connection-string convention, which object-storage client, and ho
 into `start-local`/`compose.yml`. This mirrors the exact precedent already set for WireMock
 (`e2e-api-conventions.md` §7 / `tech_stack.md`'s `e2e_external_mock`): "no compose stack exists yet
 for this — this section documents the convention for whenever it does." Neither database nor bucket
-access is wired into this project's stack today (`docs/tech_stack.md` has no object-storage field at
-all, and `itdb_helper` is explicitly IT-only per `docs/test-taxonomy.md`). If a scenario needs a
+access is wired into this project's stack today (`docs/test_stack.md` has no object-storage field at
+all, and `itdb_helper` is explicitly IT-only per `docs/test_strategy.md`). If a scenario needs a
 surface whose connection genuinely isn't wired yet, `tester` reports that as a blocker rather than
 inventing credentials or containers — but this is narrowly about the *connection*, never an excuse
 to skip *designing* the verification logic itself, which is ordinary scenario-specific work tester
@@ -157,7 +157,7 @@ always does.
 ## 3. ui_convention — Browser surface (STUB)
 
 No UI/Browser-surfaced story exists in this project yet, even though `Browser` library and
-`page/<feature>/` folders are already wired per `docs/tech_stack.md`. `ui` is the anticipated name
+`page/<feature>/` folders are already wired per `docs/test_stack.md`. `ui` is the anticipated name
 for that surface (e.g. static label text, an element's visible state, verified via
 `page/<feature>/` keywords) under `expected_data.{core_feature}.{sub_feature}.ui` — but same as
 `database`/`bucket` in §2, it's just a name tester would pick, not a reserved slot with a fixed

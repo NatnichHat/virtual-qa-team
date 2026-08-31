@@ -62,7 +62,7 @@ to grill (po-ba) is the one agent that **cannot talk to the user**. Therefore:
    destructive actions; feedback (toasts/banners); no hidden-control / URL-param workarounds.
 10. **Acceptance criteria** — pin each AC to a concrete, observable, testable assertion.
 11. **Conflicts & vision fit** — flag anything that conflicts with the product vision
-    (`docs/product_vision.md`, if present) or another requirement, and resolve it with the user before
+    (`docs/test_strategy.md`, if present) or another requirement, and resolve it with the user before
     locking.
 
 ## The locked-decisions artifact

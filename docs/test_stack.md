@@ -30,7 +30,7 @@
 - techniques_ref:                `.claude/refs/test-design-techniques.md`
 - exception_catalog_ref:         `.claude/refs/exception-catalog.md`
 - coverage_model_ref:            `.claude/refs/coverage-model.md`
-- tcm_template_ref:              `.claude/refs/tcm-template.md`
+- tcm_template_ref:              `.claude/refs/qa-templates.md`
 
 ## Coverage thresholds
 - ac_coverage_min:               1.00  (100% — every acceptance criterion has at least one test case)

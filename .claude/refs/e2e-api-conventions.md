@@ -1,9 +1,9 @@
 # Shared ref — E2E / Robot Framework API conventions
 
 Detailed how-to for the POM-style layout, the keyword-per-endpoint pattern, and the shared
-assertion/seed conventions referenced by `docs/tech_stack.md`'s `## E2E` fields. Read directly by
+assertion/seed conventions referenced by `docs/test_stack.md`'s `## E2E` fields. Read directly by
 both **tester** (author/revision mode) and **qa-analyst** (script review mode) — same precedent as
-`.claude/refs/qa-analyst-templates.md`: this is a shared reference doc, read via `Read`, not a
+`.claude/refs/qa-templates.md`: this is a shared reference doc, read via `Read`, not a
 `.claude/skills/` entry (subagents have no `Skill` tool).
 
 Adapted selectively from a real Robot Framework API project — the "Adopted vs rejected" section at
@@ -42,7 +42,7 @@ tests/e2e/
 `keyword/<feature>/` and `page/<feature>/` are physically per-feature, exactly like the project's
 existing "organize by feature" principle. `test_data/` and `test_suites/` are the **one deliberate
 exception**: both are single project-wide files because they are direct 1:1 instantiations of
-`docs/test_cases/E2E_BASELINE.md`, which is itself already the single project-wide index. Feature
+`docs/test_cases/TEST_BASELINE.md`, which is itself already the single project-wide index. Feature
 identity inside those two files is a `feature:<name>` tag, not a folder.
 
 ## 2. `config/import.resource` — the single root import
@@ -167,7 +167,7 @@ header names, and DB host/port/name.
 
 Test data lives in **one project-wide YAML file**, `test_data/e2e_baseline.yaml` — the same
 single-file exception as `test_suites/e2e_baseline.robot` (both are 1:1 instantiations of
-`E2E_BASELINE.md`). One top-level key per test case name.
+`TEST_BASELINE.md`). One top-level key per test case name.
 
 **The full data shape — `input_data`/`expected_data`, the `{core_feature}/{sub_feature}` nesting,
 and the per-surface API/UI/database/bucket sections — is documented in the sibling file
@@ -313,7 +313,7 @@ tests/e2e/config/extend_scripts/
 
 Tests never seed data via `[Setup]`/`[Teardown]` HTTP calls or DB helpers — they assume the seed
 already ran as a prerequisite step (`e2e_seed_cmd`, before `e2e_run_cmd`). This is stricter than R2
-in `docs/test-taxonomy.md` ("no UI-driven setup for seed data") since it isn't Robot-driven at all.
+in `docs/test_strategy.md` ("no UI-driven setup for seed data") since it isn't Robot-driven at all.
 
 **Same script, every environment.** The script takes `ENV=<local|sit|uat>` (passed through by
 `make e2e-seed`/`make e2e-seed-down`) and resolves connection info from `environment.yaml`'s
@@ -330,7 +330,7 @@ format supports; only the requirement is mandatory.
 
 **Two invocation modes, both idempotent:** the default `e2e_seed_cmd` clears its own previously
 inserted fixtures before inserting fresh ones — required already by the REQ Quality Gate's 3-round
-reseed against the same persistent local DB (see `.claude/refs/review-gate.md`), and equally
+reseed against the same persistent local DB (see `.claude/refs/gate-runbook.md`), and equally
 necessary against a shared, persistent SIT/UAT DB. `e2e_seed_down_cmd` (`make e2e-seed-down
 ENV=<env>`) runs the same script's cleanup-only mode — deletes those same fixtures without
 reinserting. On local, `e2e_down_cmd` incidentally wipes seeded data too (it nukes the whole
@@ -342,7 +342,7 @@ is left to the script author.
 
 ## 7. External-dependency mocks — `config/wiremock/mappings/`
 
-`docs/test-taxonomy.md`'s "Environment Wiring & Container Runtime" section requires third-party
+`docs/env_matrix.md`'s capability matrix requires third-party
 externals to be mocked **at the network level** (a mock container), never called for real during
 E2E. **WireMock** (`e2e_external_mock` in `tech_stack.md`) is the concrete tool: a standalone mock
 HTTP server that serves canned responses defined by stub **mapping** JSON files.
@@ -380,7 +380,7 @@ tests/e2e/config/wiremock/
 
 Three tiers, consulted in order, each only as needed:
 
-1. **`docs/test_cases/E2E_BASELINE.md`** — main/core source, always read first. It's a complete,
+1. **`docs/test_cases/TEST_BASELINE.md`** — main/core source, always read first. It's a complete,
    standalone spec per `E2E-*` (not a pointer): Feature, E2E ID, Scenario, US[ID], State, Tags,
    Spec ref, and the full Preconditions/Request/Steps/Expected/Cleanup body.
 2. **The originating `US[ID]_e2e_tests.md`** (reached via the baseline entry's **Spec ref** column)
@@ -388,7 +388,7 @@ Three tiers, consulted in order, each only as needed:
 3. **`architecture.md`** — read if still insufficient (exact JSON/contract specifics not already
    pinned in either of the above).
 
-This cascade exists because `E2E_BASELINE.md` serves two audiences at once: a future human
+This cascade exists because `TEST_BASELINE.md` serves two audiences at once: a future human
 "automate tester" reviewer needs it complete enough to review directly against the `.robot` script
 without opening per-REQ files, while the AI `tester` agent still benefits from being able to drill
 into the original spec or the architecture when the baseline entry alone leaves a gap.
@@ -403,7 +403,7 @@ story's already-implemented cases or test data.
 
 **On REMOVE, delete — never comment out.** When a baseline entry's State is `remove_pending_REQ[N]`,
 delete that test case from `test_suites/e2e_baseline.robot` entirely. Do not wrap it in a comment
-"just in case." `E2E_BASELINE.md`'s own tombstone entry (kept, not deleted, per its own
+"just in case." `TEST_BASELINE.md`'s own tombstone entry (kept, not deleted, per its own
 append-only rule) plus git history already preserve exactly what it used to do — a commented-out
 case left in the one shared suite file only accumulates as dead weight, and risks silently
 breaking if a keyword or data key it references is later renamed or removed by unrelated work.
