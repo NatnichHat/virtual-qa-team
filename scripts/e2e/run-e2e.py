@@ -2,10 +2,10 @@
 """Run the E2E suite and enforce the gate's zero-skip rule.
 
 Robot Framework's own exit code counts FAILED tests only — a skipped test exits 0 and
-looks green. `.claude/refs/review-gate.md` requires the opposite: "a skipped or quarantined
-test is a gate failure, not a neutral no-op", and "100% green means every summary line
-shows zero skipped alongside zero failed". Nothing enforced that until this script; it
-re-reads output.xml after the run and fails on skips as well as failures.
+looks green. `.claude/refs/gate-runbook.md` requires the opposite: "a skipped test is a
+failure, never a neutral no-op" — 100% green means every summary line shows zero skipped
+alongside zero failed. Nothing enforced that until this script; it re-reads output.xml
+after the run and fails on skips as well as failures.
 
 Output goes to a date/time-nested directory under tests/e2e/test_results/ so no run ever
 overwrites another's trio (output.xml / log.html / report.html).
@@ -14,7 +14,7 @@ Exit codes:
   0  every test passed — zero failed AND zero skipped
   1  at least one test failed or was skipped (a real gate FAIL)
   2  the run could not produce a clear verdict — robot missing, bad data, no tests
-     matched, no output.xml. This is `blocked_review_gate` territory, not a code defect.
+     matched, no output.xml. This is `blocked_gate` territory, not a code defect.
 """
 
 from __future__ import annotations
@@ -142,7 +142,7 @@ def main() -> int:
 
     if skipped:
         print(f"\nGATE FAIL: {skipped} test(s) skipped. A skipped test is a gate FAILURE, never a "
-              f"neutral no-op (see .claude/refs/review-gate.md).", file=sys.stderr)
+              f"neutral no-op (see .claude/refs/gate-runbook.md).", file=sys.stderr)
         for name in list_skipped(output_xml):
             print(f"  - {name}", file=sys.stderr)
         print("Fix the test for real, or delete it with a documented reason — never leave it "

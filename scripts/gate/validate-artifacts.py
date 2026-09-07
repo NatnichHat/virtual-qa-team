@@ -167,6 +167,59 @@ def check_placeholders(path, f):
             f.add(f"{rel}:{n}", f"unresolved placeholder — {line.strip()[:70]!r}")
 
 
+def check_count_report(path, f):
+    """tcm.md's `### Minimums vs actual` table: every category needs a filled Minimum and
+    Actual >= Minimum (gate-runbook.md). The count report is the Mandatory Counting Protocol's
+    proof — zeros are auditable, dropped terms are invisible."""
+    rel = os.path.relpath(path, REPO_ROOT)
+    text = open(path, encoding="utf-8").read()
+    idx = text.find("### Minimums vs actual")
+    if idx == -1:
+        f.add(rel, "no `### Minimums vs actual` table — the Counting Protocol's proof is missing")
+        return
+    rows = {}
+    for line in text[idx:].splitlines()[1:]:
+        s = line.strip()
+        if s.startswith("#"):
+            break
+        if not s.startswith("|"):
+            continue
+        cells = [c.strip() for c in s.strip("|").split("|")]
+        if len(cells) < 4:
+            continue
+        cat = cells[0].strip("*` ").lower()
+        if cat in ("category", "") or set(cat) <= {"-", " "}:
+            continue
+        rows[cat] = (cells[2], cells[3])
+    if not rows:
+        f.add(rel, "`### Minimums vs actual` table has no parseable rows")
+        return
+    total_min, total_act, seen_total = 0, 0, None
+    for cat, (mn, ac) in rows.items():
+        if cat == "total":
+            seen_total = (mn, ac)
+            continue
+        try:
+            m, a = int(mn), int(ac)
+        except ValueError:
+            f.add(rel, f"Count Report category {cat!r}: Minimum/Actual not filled "
+                       f"({mn!r}/{ac!r}) — write the zeros")
+            continue
+        if a < m:
+            f.add(rel, f"Count Report: {cat} actual ({a}) < minimum ({m}) — add cases, or record "
+                       f"the shortfall in ## Spec non-compliance")
+        total_min += m
+        total_act += a
+    if seen_total:
+        try:
+            tm, ta = int(seen_total[0]), int(seen_total[1])
+            if (tm, ta) != (total_min, total_act):
+                f.add(rel, f"Count Report TOTAL ({tm}/{ta}) does not match the sum of the "
+                           f"categories ({total_min}/{total_act})")
+        except ValueError:
+            f.add(rel, f"Count Report TOTAL row is not numeric ({seen_total[0]!r}/{seen_total[1]!r})")
+
+
 def check_impact(req_dir, f):
     path = os.path.join(req_dir, "impact_analysis.md")
     if not os.path.exists(path):
@@ -245,6 +298,9 @@ def main():
                 check_placeholders(p, f)
             else:
                 f.add(os.path.relpath(story, REPO_ROOT), f"{name} missing")
+        tcm = os.path.join(story, "tcm.md")
+        if os.path.exists(tcm):
+            check_count_report(tcm, f)
 
         # AC coverage must be 1.00 — an uncovered criterion is a requirement nobody tested
         req_id = os.path.basename(os.path.dirname(story)).split("_")[0]

@@ -14,9 +14,9 @@
 # WHY THIS IS NEVER AUTO-INVOKED BY up/seed/run: it's a one-time (or CI-image-cacheable) setup
 # step, not a per-run concern — same precedent as Podman itself never being auto-installed by
 # require_podman() in stack.sh. `robot` (and, when in use, its Browser-library binaries) must
-# already be on PATH before e2e_dryrun_cmd, e2e_run_cmd, or tester's own Author-mode dryrun
-# step ever run — this script is how that precondition gets satisfied, run once per
-# machine/CI image, not wired into the up/seed/run chain.
+# already be on PATH before e2e_dryrun_cmd, e2e_run_cmd, or automation-engineer's own
+# author-mode dryrun step ever run — this script is how that precondition gets satisfied, run
+# once per machine/CI image, not wired into the up/seed/run chain.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -30,9 +30,9 @@ note() { echo "deps.sh: $*"; }
 [[ -f "$REQS" ]] || die "no requirements file at tests/e2e/requirements.txt.
    This file ships with the skeleton and is tracked in git, so the usual cause is that it was
    deleted locally — recover it with 'git checkout -- tests/e2e/requirements.txt' rather than
-   rewriting it, since its exact pins are load-bearing for the Mode 2 flake check.
-   On a project that genuinely never had it, 'tester' creates it on the first e2e task (see
-   .claude/agents/tester.md -> Author mode step 2b); see that file's own header for the
+   rewriting it, since its exact pins are load-bearing for the /phase5 3-round flake check.
+   On a project that genuinely never had it, automation-engineer creates it on the first e2e
+   task (see .claude/agents/automation-engineer.md); see that file's own header for the
    pinning and ownership convention."
 
 command -v python3 &>/dev/null || die "python3 is not on PATH — this is a genuine host
@@ -45,15 +45,12 @@ command -v pip3 &>/dev/null || die "pip3 is not on PATH (python3 was found, but 
 # Browser library's own init step shells out to npm under the hood (see the 'install' section
 # below) — checked here, before any pip install runs, so a missing Node/npm fails fast with an
 # actionable message instead of a raw Python traceback from deep inside `rfbrowser init`.
-# Node/npm is already an assumed host precondition for this repo's frontend track
-# (frontend_test_cmd/frontend_lint_cmd in tech_stack.md both shell out to npm) — same tier as
-# Podman: never installed by this script, only checked for.
+# Same tier as Podman: never installed by this script, only checked for.
 if grep -q '^robotframework-browser' "$REQS" 2>/dev/null; then
   command -v node &>/dev/null && command -v npm &>/dev/null || die "robotframework-browser is
      in tests/e2e/requirements.txt, but node/npm are not on PATH — 'rfbrowser init' shells out
      to npm to fetch its browser binaries and will fail without it. Install Node.js (which
-     bundles npm; this repo's frontend track already assumes it's present, see
-     frontend_test_cmd in docs/tech_stack.md), then re-run: make e2e-deps"
+     bundles npm), then re-run: make e2e-deps"
 fi
 
 # ── install ──────────────────────────────────────────────────────────────────
@@ -62,9 +59,8 @@ rel="${REQS#"$REPO_ROOT"/}"
 note "installing $rel"
 # --user, not a bare 'pip3 install': writes to this user's site-packages (e.g. ~/.local/bin
 # on PATH) instead of requiring sudo/system-wide access — and, unlike a project-local
-# .venv/, resolves identically from the repo root AND from every .worktrees/<task>/
-# subdirectory a be-dev/fe-dev task runs in, since worktrees share the host/user, not a
-# fresh environment.
+# .venv/, resolves identically from the repo root AND from any worktree subdirectory the
+# repo may be checked out under, since worktrees share the host/user, not a fresh environment.
 #
 # An ACTIVE virtualenv is the one case where --user is not just unnecessary but fatal: pip
 # refuses it outright ("Can not perform a '--user' install. User site-packages are not
@@ -110,7 +106,7 @@ fi
 
 # Browser library needs a second step beyond `pip install`: it fetches its own browser
 # binaries (Playwright-backed). Only run it if the package is actually in requirements.txt —
-# grepping the already-resolved file (not re-parsing tech_stack.md's free-text Framework
+# grepping the already-resolved file (not re-parsing test_stack.md's free-text Automation
 # field) keeps this decision coupled to one source of truth. The 'robot' PATH check just above
 # already proves the --user bin dir is on PATH, so 'rfbrowser' (installed alongside it) will
 # resolve too — no separate PATH check needed here.

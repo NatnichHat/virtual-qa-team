@@ -13,7 +13,7 @@
 # `make e2e-up && make e2e-seed && make e2e-run` would then run the suite against a stack
 # that was never started and report the failures as test defects. So each action
 # preflights its prerequisites and exits 2 ("cannot run — broken gate/tooling", matching
-# scripts/e2e/run-e2e.py and scripts/review/run-gate.sh) with the name of whoever owns the
+# scripts/e2e/run-e2e.py and scripts/gate/run-gate.sh) with the name of whoever owns the
 # missing piece. Exit 2 is never a pass.
 #
 # LOCAL-ONLY vs ENV-AWARE — this split is deliberate, see the Makefile header:
@@ -42,24 +42,30 @@ note() { echo "stack.sh: $*"; }
 # ── preflight helpers ────────────────────────────────────────────────────────
 
 require_podman() {
-  # tech_stack.md pins Podman and states the docker binary is NOT installed. Never silently
-  # fall back to docker — a project that swapped runtimes should say so in tech_stack.md.
+  # The container runtime is a decision `/init` records (docs/test_stack.md ->
+  # container_runtime). This function drives whichever runtime that field settled on; today
+  # it checks podman first. It never silently falls back to another runtime — a project
+  # that swapped runtimes should say so in test_stack.md, and this function should be
+  # updated to match.
   command -v podman-compose &>/dev/null && { COMPOSE=(podman-compose); return; }
   if command -v podman &>/dev/null && podman compose --help &>/dev/null; then
     COMPOSE=(podman compose); return
   fi
   die "neither 'podman-compose' nor 'podman compose' is available — the e2e stack cannot be
-     brought up. Install Podman (see docs/tech_stack.md -> Container runtime + compose).
-     Do NOT substitute docker: tech_stack.md states the docker binary is not installed."
+     brought up. The container runtime for this project is set in docs/test_stack.md ->
+     container_runtime (decided at /init); install that runtime and re-run. This script
+     never substitutes a different runtime silently."
 }
 
 require_compose_file() {
   [[ -f "$COMPOSE_FILE" ]] || die "no compose file at ${COMPOSE_FILE#"$REPO_ROOT"/}.
      The application stack (backend services + frontend + datastore + external mocks) has no
-     compose definition yet — that is the platform/dev track's deliverable, not something
-     this target can synthesise. Until it exists, the local e2e stack cannot start, and any
-     gate that depends on a live stack is blocked_review_gate, not a failing test.
-     Override the path with COMPOSE_FILE=<path> if your project keeps it elsewhere."
+     compose definition yet — that is the SUT team's deliverable, not something this target
+     can synthesise. (If /init decided 'local' points at a shared dev deployment instead of
+     composing locally, none of these local-stack targets apply — see docs/env_matrix.md.)
+     Until it exists, the local e2e stack cannot start, and any gate that depends on a live
+     stack is blocked_gate, not a failing test. Override the path with COMPOSE_FILE=<path>
+     if your project keeps it elsewhere."
 }
 
 require_local_env() {
@@ -71,22 +77,22 @@ require_local_env() {
 
 resolve_seed_script() {
   [[ -d "$SEED_DIR" ]] || die "no seed script directory at ${SEED_DIR#"$REPO_ROOT"/}.
-     The seed/cleanup script is part of the e2e scaffold, created by 'tester' on the first
-     e2e task in the project (see .claude/agents/tester.md -> Author mode step 2b). Run
-     /phase2b at least once, or create it by hand following
+     The seed/cleanup script is part of the e2e scaffold, created by automation-engineer on
+     the first automation task in the project (see .claude/agents/automation-engineer.md).
+     Run /phase4 at least once, or create it by hand following
      .claude/refs/e2e-api-conventions.md section 6."
-  # One script, name chosen by the project — tech_stack.md's e2e_seed_script points at this
+  # One script, name chosen by the project — test_stack.md's e2e_seed_cmd points at this
   # directory rather than pinning a filename or language.
   local found=()
   while IFS= read -r f; do found+=("$f"); done < <(find "$SEED_DIR" -maxdepth 1 -type f \
       \( -name '*.py' -o -name '*.sh' -o -perm -u+x \) | sort)
   case "${#found[@]}" in
     0) die "${SEED_DIR#"$REPO_ROOT"/} exists but holds no seed script.
-     Same owner as above: tester's Author-mode step 2b." ;;
+     Same owner as above: automation-engineer's scaffold bootstrap." ;;
     1) SEED_SCRIPT="${found[0]}" ;;
     *) die "${SEED_DIR#"$REPO_ROOT"/} holds more than one candidate script:
      $(printf '%s ' "${found[@]##*/}")
-     e2e_seed_script names ONE entry point. Keep a single script (it may import others)." ;;
+     e2e_seed_cmd expects ONE entry point. Keep a single script (it may import others)." ;;
   esac
 }
 
@@ -97,7 +103,7 @@ check_env_known() {
   [[ -f "$ENV_YAML" ]] || { note "warn: ${ENV_YAML#"$REPO_ROOT"/} not found — cannot verify ENV=$ENV_NAME is a known environment"; return; }
   grep -qE "^[[:space:]]+${ENV_NAME}:" "$ENV_YAML" \
     || die "ENV=$ENV_NAME has no entry under Environment: in ${ENV_YAML#"$REPO_ROOT"/}.
-     Known environments are the keys defined there (see docs/tech_stack.md -> e2e_env_select)."
+     Known environments are the keys defined there (see docs/test_stack.md -> e2e_env_select)."
 }
 
 run_seed() {

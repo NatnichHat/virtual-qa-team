@@ -2,8 +2,8 @@
 """Read-only drift-guard for docs/test_cases/TEST_BASELINE.md.
 
 This NEVER writes to the baseline, never flips a State, and never touches an entry's
-authored prose. qa-analyst owns all of that (Author mode sets the pending State; Script
-review mode flips pending -> confirmed). This script only audits, and reports.
+authored prose. qa-analyst sets the pending States at merge time; script-reviewer is the
+only agent that flips pending -> confirmed. This script only audits, and reports.
 
 Two audits:
 
@@ -13,7 +13,7 @@ Two audits:
   STALE      — a PENDING entry (planned / modify_pending_* / remove_pending_*) that has
                been left behind:
                  hard  — the round closed (both Approvals `approved`) but the entry was
-                         never confirmed; qa-analyst's script review skipped it
+                         never confirmed; script-reviewer skipped it
                  soft  — the round has been open longer than --stale-days
 
 Exit codes:
@@ -22,8 +22,8 @@ Exit codes:
   2  bad invocation / a required input file is unreadable
 
 Usage:
-  baseline-drift.py                 # report only, always exit 0   (`make e2e-baseline`)
-  baseline-drift.py --check         # exit 1 on any finding  (`make e2e-baseline-check`)
+  baseline-drift.py                 # report only, always exit 0   (`make baseline`)
+  baseline-drift.py --check         # exit 1 on any finding  (`make baseline-check`)
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file_
 DEFAULT_BASELINE = os.path.join(REPO_ROOT, "docs", "test_cases", "TEST_BASELINE.md")
 DEFAULT_SUITE = os.path.join(REPO_ROOT, "tests", "e2e", "test_suites", "e2e_baseline.robot")
 
-# State vocabulary — see docs/tech_stack.md -> e2e_baseline.
+# State vocabulary — see docs/test_stack.md -> e2e_baseline.
 PENDING_STATES = ("planned", "modify_pending_REQ", "remove_pending_REQ")
 E2E_ID_RE = re.compile(r"\bE2E-[A-Za-z0-9_-]+\b")
 
@@ -115,7 +115,7 @@ def parse_suite(path: str) -> set[str]:
 
     Tags are the authority: Robot's --include filters by tag alone, so an ID that appears
     only in a test case name or [Documentation] is not selectable and does not count as
-    implemented (see docs/tech_stack.md -> e2e_organization).
+    implemented (see docs/test_stack.md -> e2e_organization).
     """
     if not os.path.isfile(path):
         return set()
@@ -178,7 +178,7 @@ def main() -> int:
         return 0
 
     tc_approval = approval.get("Test case Approval", "—")
-    script_approval = approval.get("E2E Script Approval", "—")
+    script_approval = approval.get("Script Approval", "—")
     round_closed = tc_approval == "approved" and script_approval == "approved"
     age = round_age_days(approval.get("Round started", ""))
 

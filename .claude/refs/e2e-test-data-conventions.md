@@ -4,9 +4,9 @@ Authoritative shape for `test_data/e2e_baseline.yaml` — split out of
 `.claude/refs/e2e-api-conventions.md` (which used to own this in its old §3) so that a shared
 **core convention** can stay stable while each verification **surface** (API, UI, database, bucket)
 grows its own section without turning that file's data-section into an ever-branchier mess. Same
-status as its sibling: a shared reference doc, read directly by both **tester** (author/revision
-mode — it authors `test_data/e2e_baseline.yaml`) and **qa-analyst** (script review mode — it checks
-tester's YAML against this shape), via `Read`, not a `.claude/skills/` entry.
+status as its sibling: a shared reference doc, read directly by both **automation-engineer**
+(authors and revises `test_data/e2e_baseline.yaml`) and **script-reviewer** (checks that YAML
+against this shape firsthand, before G5), via `Read`, not a `.claude/skills/` entry.
 
 Read `.claude/refs/e2e-api-conventions.md` alongside this file: §4 (keyword-per-endpoint pattern)
 and §5 (the two generic assertion keywords) define how a keyword *consumes* the data this file
@@ -61,8 +61,8 @@ surfaces its result touches.
 
 **`surface` is an open name, not a fixed enum.** `api` is the one surface with a defined, reusable
 mechanism (below — it always goes through the two `e2e_assertion_helper` keywords). Beyond that,
-`tester` names whatever surface a scenario actually needs — `database`, `bucket`, or anything
-else — and designs the verification for it itself (see "Database/bucket — examples, not a
+`automation-engineer` names whatever surface a scenario actually needs — `database`, `bucket`, or
+anything else — and designs the verification for it itself (see "Database/bucket — examples, not a
 contract," below). The only thing this convention fixes is *where in the YAML* that verification's
 data lives, never *how* it's checked.
 
@@ -100,9 +100,9 @@ E2E-REQ012-US045-001 Create Order Happy Path:
 
 ### Seed vs. verify — these are not the same thing
 
-`e2e_seed_script`-loaded data (per `e2e-api-conventions.md` §6) is a **prerequisite** — it is loaded
-before the suite runs and is never itself an assertion target (unchanged; see R2 in
-`docs/test_strategy.md`). The `database`/`bucket` blocks in this section exist for the **opposite**
+Seed-script-loaded data (per `e2e-api-conventions.md` §6) is a **prerequisite** — it is loaded
+before the suite runs and is never itself an assertion target. The `database`/`bucket` blocks in
+this section exist for the **opposite**
 case: a step in the test case's own flow — the keyword call under test — writes, updates, or
 deletes a database row or a bucket object, and *that resulting state change* is a first-class thing
 the test must verify, exactly as it verifies an API response. A scenario whose action has such a
@@ -113,8 +113,8 @@ optional extra — the same way a scenario that never checks the response body w
 
 The two blocks below show what a `database` and a `bucket` surface *might* look like for a
 scenario that needs one. They are **illustrations of the nesting pattern, not a fixed schema** —
-tester is free to add, drop, or rename fields to fit what a given scenario actually needs to pin
-down, as long as the block still sits at `expected_data.{core_feature}.{sub_feature}.{surface}`.
+automation-engineer is free to add, drop, or rename fields to fit what a given scenario actually
+needs to pin down, as long as the block still sits at `expected_data.{core_feature}.{sub_feature}.{surface}`.
 
 ```yaml
 database:                         # one possible shape — adapt freely
@@ -131,28 +131,29 @@ bucket:                           # another possible shape — adapt freely
 ```
 
 **No fixed keyword exists for `database`/`bucket`/any other non-`api` surface, and none should be
-invented preemptively.** `tester` designs and writes whatever verification the scenario's action
-actually needs, inside the per-endpoint keyword (or a small helper it calls), the same way it would
-design any other piece of test logic: a plain structural check reuses `Verify Deep Response Matches
-Expected` (`e2e-api-conventions.md` §5) directly, exactly like the `api` surface does; something
-that isn't a plain field-equality check (e.g. a similarity-threshold comparison, a time-window
-check) is bespoke logic `tester` writes for that keyword — it is not forced through the generic
-deep-diff keyword just because a structural check happens to be the default for `api`. Either way,
-verification stays entirely inside the keyword; a test case never queries a DB or bucket directly.
+invented preemptively.** `automation-engineer` designs and writes whatever verification the
+scenario's action actually needs, inside the per-endpoint keyword (or a small helper it calls),
+the same way it would design any other piece of test logic: a plain structural check reuses
+`Verify Deep Response Matches Expected` (`e2e-api-conventions.md` §5) directly, exactly like the
+`api` surface does; something that isn't a plain field-equality check (e.g. a similarity-threshold
+comparison, a time-window check) is bespoke logic it writes for that keyword — it is not forced
+through the generic deep-diff keyword just because a structural check happens to be the default
+for `api`. Either way, verification stays entirely inside the keyword; a test case never queries
+a DB or bucket directly.
 
 ### Deferral note — connection wiring is a separate task, writing the check is not
 
 What's out of scope, and deliberately deferred, is the underlying **connection**: which Robot DB
 library, which connection-string convention, which object-storage client, and how each gets wired
 into `start-local`/`compose.yml`. This mirrors the exact precedent already set for WireMock
-(`e2e-api-conventions.md` §7 / `tech_stack.md`'s `e2e_external_mock`): "no compose stack exists yet
+(`e2e-api-conventions.md` §7 / `test_stack.md`'s `e2e_external_mock`): "no compose stack exists yet
 for this — this section documents the convention for whenever it does." Neither database nor bucket
-access is wired into this project's stack today (`docs/test_stack.md` has no object-storage field at
-all, and `itdb_helper` is explicitly IT-only per `docs/test_strategy.md`). If a scenario needs a
-surface whose connection genuinely isn't wired yet, `tester` reports that as a blocker rather than
-inventing credentials or containers — but this is narrowly about the *connection*, never an excuse
-to skip *designing* the verification logic itself, which is ordinary scenario-specific work tester
-always does.
+access is wired into this project's stack today (`docs/test_stack.md` has no object-storage field
+at all, and the DB connection details live in `environment.yaml`'s `database` block, still TBD per
+`docs/env_matrix.md`). If a scenario needs a surface whose connection genuinely isn't wired yet,
+`automation-engineer` reports that as a blocker rather than inventing credentials or containers —
+but this is narrowly about the *connection*, never an excuse to skip *designing* the verification
+logic itself, which is ordinary scenario-specific work it always does.
 
 ## 3. ui_convention — Browser surface (STUB)
 
@@ -160,6 +161,6 @@ No UI/Browser-surfaced story exists in this project yet, even though `Browser` l
 `page/<feature>/` folders are already wired per `docs/test_stack.md`. `ui` is the anticipated name
 for that surface (e.g. static label text, an element's visible state, verified via
 `page/<feature>/` keywords) under `expected_data.{core_feature}.{sub_feature}.ui` — but same as
-`database`/`bucket` in §2, it's just a name tester would pick, not a reserved slot with a fixed
-shape. The full shape is deliberately **not** designed yet, to avoid speculative design for a track
+`database`/`bucket` in §2, it's just a name automation-engineer would pick, not a reserved slot
+with a fixed shape. The full shape is deliberately **not** designed yet, to avoid speculative design for a track
 this project doesn't have; fill this section in when the first UI-surfaced REQ actually lands.

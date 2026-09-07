@@ -102,6 +102,31 @@ gate_scripts() {
     fi
   done
   info "ok: feature folders checked"
+
+  step "test-data keys — every test case name has an exact-matching YAML key"
+  # Prepare Test Data resolves ${${TEST_NAME}} from test_data/e2e_baseline.yaml; a case whose
+  # name has no exact top-level key there fails at Test Setup with a variable-not-found error
+  # at run time. Catch it at the gate instead — top-level keys are column-0 `key:` lines.
+  local yaml="$E2E/test_data/e2e_baseline.yaml"
+  if [ ! -f "$yaml" ]; then
+    fail "test_data/e2e_baseline.yaml missing — every test case's data key lives in this single file"
+  else
+    local names keys miss
+    names=$(awk '/^\*\*\* Test Cases? \*\*\*/{f=1;next} /^\*\*\*/{f=0} f && /^[^[:space:]#]/' \
+            "$SUITE_DIR"/*.robot 2>/dev/null | sed 's/[[:space:]]*$//' | sort -u || true)
+    keys=$(grep -E '^[^[:space:]#][^:]*:' "$yaml" | cut -d: -f1 | sed 's/[[:space:]]*$//' | sort -u || true)
+    if [ -z "$names" ]; then
+      info "ok: suite has no test cases yet"
+    else
+      miss=$(comm -23 <(printf '%s\n' "$names") <(printf '%s\n' "$keys") | grep -v '^$' || true)
+      if [ -n "$miss" ]; then
+        fail "these test cases have no matching top-level key in test_data/e2e_baseline.yaml:"
+        printf '%s\n' "$miss" | sed 's/^/      /'
+      else
+        info "ok: every test case has a data key"
+      fi
+    fi
+  fi
 }
 
 gate_artifacts() {

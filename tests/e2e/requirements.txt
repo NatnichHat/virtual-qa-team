@@ -1,61 +1,55 @@
 # Python dependencies for the Robot Framework e2e suite (tests/e2e/).
-# Installed via `make e2e-deps` (scripts/e2e/deps.sh) — see docs/tech_stack.md's
+# Installed via `make e2e-deps` (scripts/e2e/deps.sh) — see docs/test_stack.md's
 # e2e_deps_cmd field. Never installed automatically by e2e-up/e2e-seed/e2e-run — those bring
 # up the application stack under test, not the test-runner itself. This is a one-time host
 # setup step, same tier as installing Podman.
 #
-# This repo's docs/tech_stack.md -> E2E -> Framework field names BOTH RequestsLibrary and
-# Browser library, so both are pinned below. A project forked from this skeleton with only
+# This repo's docs/test_stack.md -> Automation -> Framework field names BOTH RequestsLibrary
+# and Browser library, so both are pinned below. A project forked from this skeleton with only
 # one library in use should trim the unused package's line — deps.sh itself makes no
 # assumption either way; it only checks what this file actually lists.
 #
-# EXACT (==) pins, not minimum-version (>=) pins. This is not a style preference — it is
-# required by .claude/refs/review-gate.md's zero-tolerance rule for the REQ Quality Gate:
-# "If the tool has a version that can drift on re-install … pin it and use the pinned version
-# for every gate run within a REQ — a floating version can score the same code differently
-# between runs, which isn't a real regression and isn't reproducible."
+# EXACT (==) pins, not minimum-version (>=) pins. A floating version can score the same code
+# differently between runs — which isn't a real regression and isn't reproducible.
 #
-# The e2e runner is exactly such a tool, and Mode 2 is exactly where it bites: that gate
-# requires THREE CONSECUTIVE GREEN RUNS to prove the suite isn't flaky. With `>=`, two hosts
-# (or one host before and after a release lands) can resolve different Robot versions, so a
-# parse or keyword-behaviour difference shows up as a failed round that reproduces nowhere —
-# indistinguishable from the real flake the gate exists to catch, and far more expensive to
-# chase because the suspect isn't in the diff.
+# The e2e runner is exactly such a tool, and /phase5 is exactly where it bites: the execution
+# gate requires THREE CONSECUTIVE GREEN RUNS to prove the suite isn't flaky. With `>=`, two
+# hosts (or one host before and after a release lands) can resolve different Robot versions,
+# so a parse or keyword-behaviour difference shows up as a failed round that reproduces
+# nowhere — indistinguishable from the real flake the gate exists to catch, and far more
+# expensive to chase because the suspect isn't in the diff.
 #
 # OWNERSHIP — two different edits, two different owners:
-#   ADD a line     → tester, in ANY round (its Author-mode step 2c). Seed-script drivers and the
-#                    like cannot be known before the seed script is written, so appending is
-#                    ordinary work, not bootstrapping. Additive: moves no existing version.
-#   BUMP a version → tech-lead-reviewer ONLY, at the very start of its REQ's Mode 2 (step 0).
-#                    `e2e_deps_cmd` installs onto the SHARED HOST, so a bump lands instantly in
-#                    every .worktrees/ on that machine — including tasks of a different REQ that
-#                    is mid-Phase-3 and whose 3-round flake check is calibrated on the old
-#                    version. Only Mode 2 is both once-per-REQ and able to prove the new version
-#                    immediately, by running those 3 rounds right after. Nobody else bumps —
-#                    not tester, not a dev, not to make a failing test pass.
-#
-# BUMPING CADENCE: start of a REQ, never mid-REQ — the rule review-gate.md states, so the bar
-# stays current without moving under a gate that is mid-flight. Re-check PyPI for current stable
-# when you bump; never guess a version number.
+#   ADD a line     → automation-engineer, in ANY round (its workflow step 2). Seed-script
+#                    drivers and the like cannot be known before the seed script is written, so
+#                    appending is ordinary work, not bootstrapping. Additive: moves no existing
+#                    version.
+#   BUMP a version → a HUMAN decision only, taken at the start of a REQ, before /phase4 —
+#                    never mid-REQ. `e2e_deps_cmd` installs onto the SHARED HOST, so a bump
+#                    lands instantly everywhere on that machine — including any other REQ whose
+#                    3-round flake check is calibrated on the old version. The bar must not move
+#                    under a gate that is mid-flight. Nobody else bumps — not
+#                    automation-engineer (which may only append), not to make a failing test
+#                    pass. Re-check PyPI for current stable when you bump; never guess a
+#                    version number.
 #
 # Versions below were confirmed current-stable via live PyPI lookup on 2026-08-11.
 
 robotframework==7.4.2
 
-# RequestsLibrary — HTTP/API testing (tech_stack.md E2E Framework: "RequestsLibrary (HTTP)")
+# RequestsLibrary — HTTP/API testing (test_stack.md Automation Framework)
 robotframework-requests==0.9.7
 
-# Browser library (Playwright-backed) — UI testing (tech_stack.md E2E Framework: "Browser
-# library (UI)"). Installing this package is NOT enough on its own: after `pip install` it
-# also needs `rfbrowser init` once to fetch its browser binaries — deps.sh runs that step
-# automatically, conditional on this package appearing in this file. `rfbrowser init` itself
-# shells out to npm, so Node.js/npm must already be on PATH (deps.sh preflights this and dies
-# with an actionable message rather than letting `rfbrowser init` fail with a raw traceback);
-# this repo's frontend track already assumes Node/npm is present (see frontend_test_cmd in
-# docs/tech_stack.md), so this is rarely a fresh precondition on a project with a frontend.
+# Browser library (Playwright-backed) — UI testing (test_stack.md Automation Framework).
+# Installing this package is NOT enough on its own: after `pip install` it also needs
+# `rfbrowser init` once to fetch its browser binaries — deps.sh runs that step automatically,
+# conditional on this package appearing in this file. `rfbrowser init` itself shells out to
+# npm, so Node.js/npm must already be on PATH (deps.sh preflights this and dies with an
+# actionable message rather than letting `rfbrowser init` fail with a raw traceback).
 robotframework-browser==20.3.0
 
 # ── Seed/cleanup script deps ──────────────────────────────────────────────────
 # Add here if tests/e2e/config/extend_scripts/<script> needs a DB/HTTP client (e.g.
-# psycopg2-binary, PyYAML, python-dotenv). Empty until the seed script exists — tester owns
-# this file going forward, see .claude/agents/tester.md Author-mode step 2b.
+# psycopg2-binary, PyYAML, python-dotenv). Empty until the seed script exists —
+# automation-engineer appends (never bumps) per its workflow step 2, see
+# .claude/agents/automation-engineer.md.

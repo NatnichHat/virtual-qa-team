@@ -1,10 +1,11 @@
 # Shared ref — E2E / Robot Framework API conventions
 
 Detailed how-to for the POM-style layout, the keyword-per-endpoint pattern, and the shared
-assertion/seed conventions referenced by `docs/test_stack.md`'s `## E2E` fields. Read directly by
-both **tester** (author/revision mode) and **qa-analyst** (script review mode) — same precedent as
-`.claude/refs/qa-templates.md`: this is a shared reference doc, read via `Read`, not a
-`.claude/skills/` entry (subagents have no `Skill` tool).
+assertion/seed conventions referenced by `docs/test_stack.md`'s `## Automation` fields. Read
+directly by both **automation-engineer** (authoring/revising the scripts) and **script-reviewer**
+(verifying them firsthand before G5) — same precedent as `.claude/refs/qa-templates.md`: this is
+a shared reference doc, read via `Read`, not a `.claude/skills/` entry (subagents have no `Skill`
+tool).
 
 Adapted selectively from a real Robot Framework API project — the "Adopted vs rejected" section at
 the bottom records what was deliberately left behind, so it doesn't get reintroduced later by
@@ -293,18 +294,18 @@ Verify Deep Response Matches Expected
 
 Every per-endpoint keyword calls these two internally instead of re-inventing inline `Should Be
 Equal` chains — the body-diff call is conditional on the keyword receiving an `${expected_body}`
-argument (§4). This is what lets `qa-analyst`'s `e2e_tests.md` template's exact-JSON `Expect:`
-block translate directly into a field-precise assertion without hand-rolled per-scenario checks.
+argument (§4). This is what lets `design_notes.md`'s concrete Expected outcomes translate
+directly into field-precise assertions without hand-rolled per-scenario checks.
 
 `.claude/refs/e2e-test-data-conventions.md` §2 covers scenarios whose action also has a database,
-bucket, or other side effect to verify — there's no fixed keyword template for those (tester
-designs the check itself, reusing `Verify Deep Response Matches Expected` above where it's a plain
-structural comparison, writing bespoke logic otherwise).
+bucket, or other side effect to verify — there's no fixed keyword template for those
+(automation-engineer designs the check itself, reusing `Verify Deep Response Matches Expected`
+above where it's a plain structural comparison, writing bespoke logic otherwise).
 
 ## 6. Seed/cleanup — `config/extend_scripts/`, not a Robot keyword
 
 Since e2e runs against a real dev-environment stack already, seed/cleanup is a plain script (Python
-or shell — whatever `stack-init` picked when it filled in `e2e_seed_script`), not a Robot keyword:
+or shell — `scripts/e2e/stack.sh` resolves the single script in this directory), not a Robot keyword:
 
 ```
 tests/e2e/config/extend_scripts/
@@ -333,18 +334,19 @@ inserted fixtures before inserting fresh ones — required already by the REQ Qu
 reseed against the same persistent local DB (see `.claude/refs/gate-runbook.md`), and equally
 necessary against a shared, persistent SIT/UAT DB. `e2e_seed_down_cmd` (`make e2e-seed-down
 ENV=<env>`) runs the same script's cleanup-only mode — deletes those same fixtures without
-reinserting. On local, `e2e_down_cmd` incidentally wipes seeded data too (it nukes the whole
-compose stack's DB volume), so `e2e-seed-down` is somewhat redundant there but still available for
-consistency; on SIT/UAT — which has no stack to tear down — it's the *only* cleanup mechanism, so a
-human doing a manual smoke session runs `make e2e-seed-down ENV=sit` afterward to avoid leaving
-clutter in a shared environment. The exact deletion logic (by known ID list, by a tag column, etc.)
+reinserting. On local — if and only if `/init` decides `local` means a compose stack
+(`start_local_cmd` in `test_stack.md`) — `make e2e-down` incidentally wipes seeded data too (it
+nukes the whole compose stack's DB volume), so `e2e-seed-down` is somewhat redundant there but
+still available for consistency; on SIT/UAT — which has no stack to tear down — it's the *only*
+cleanup mechanism, so a human doing a manual smoke session runs `make e2e-seed-down ENV=sit`
+afterward to avoid leaving clutter in a shared environment. The exact deletion logic (by known ID list, by a tag column, etc.)
 is left to the script author.
 
 ## 7. External-dependency mocks — `config/wiremock/mappings/`
 
 `docs/env_matrix.md`'s capability matrix requires third-party
 externals to be mocked **at the network level** (a mock container), never called for real during
-E2E. **WireMock** (`e2e_external_mock` in `tech_stack.md`) is the concrete tool: a standalone mock
+E2E. **WireMock** (`e2e_external_mock` in `test_stack.md`) is the concrete tool: a standalone mock
 HTTP server that serves canned responses defined by stub **mapping** JSON files.
 
 ```
@@ -362,10 +364,11 @@ tests/e2e/config/wiremock/
 - Add a sibling `__files/` directory only if a stub needs to serve a large canned response body
   WireMock references by path rather than inlining.
 - **Wiring the actual WireMock container into `start-local`/`compose.yml` is a separate infra task**
-  — no compose stack exists yet in this project (see the Makefile scope note in `tech_stack.md`).
-  This section documents the convention for whenever that container exists; `tester` adds/edits
-  mapping files here when a scenario needs a new external call stubbed, same as it would add a
-  `keyword/<feature>/` file — it does not stand up the container itself.
+  — no compose stack exists yet in this project (`start_local_cmd` in `test_stack.md` is TBD until
+  `/init` decides how `local` comes up). This section documents the convention for whenever that
+  container exists; `automation-engineer` adds/edits mapping files here when a scenario needs a new
+  external call stubbed, same as it would add a `keyword/<feature>/` file — it does not stand up
+  the container itself.
 - **Local-only, and not a filter or a switch.** WireMock is a container that only ever exists inside
   the local compose stack (`start-local`/`e2e-up`) — SIT/UAT are already-deployed environments this
   repo doesn't compose at all, so there is no WireMock instance reachable from them, and nothing
@@ -376,22 +379,23 @@ tests/e2e/config/wiremock/
   environment-conditional logic either way; the same test steps work unmodified against a real third
   party in SIT/UAT.
 
-## 8. Reading cascade — how `tester` finds a scenario's detail
+## 8. Reading cascade — how `automation-engineer` finds a scenario's detail
 
-Three tiers, consulted in order, each only as needed:
+Three tiers, consulted in order, each only as needed (mirrored in
+`.claude/agents/automation-engineer.md`):
 
 1. **`docs/test_cases/TEST_BASELINE.md`** — main/core source, always read first. It's a complete,
    standalone spec per `E2E-*` (not a pointer): Feature, E2E ID, Scenario, US[ID], State, Tags,
    Spec ref, and the full Preconditions/Request/Steps/Expected/Cleanup body.
-2. **The originating `US[ID]_e2e_tests.md`** (reached via the baseline entry's **Spec ref** column)
-   — read when baseline's detail isn't enough to implement confidently.
-3. **`architecture.md`** — read if still insufficient (exact JSON/contract specifics not already
-   pinned in either of the above).
+2. **The originating `design_notes.md`** (reached via the baseline entry's **Spec ref** column) —
+   read when the baseline entry's detail isn't enough to implement confidently.
+3. **`docs/test_basis.md`** — read if still insufficient (exact JSON/contract specifics not
+   already pinned in either of the above; the oracle every expected result cites).
 
-This cascade exists because `TEST_BASELINE.md` serves two audiences at once: a future human
-"automate tester" reviewer needs it complete enough to review directly against the `.robot` script
-without opening per-REQ files, while the AI `tester` agent still benefits from being able to drill
-into the original spec or the architecture when the baseline entry alone leaves a gap.
+This cascade exists because `TEST_BASELINE.md` serves two audiences at once: the human reviewer at
+G5 needs it complete enough to review directly against the `.robot` script without opening per-REQ
+files, while `automation-engineer` still benefits from being able to drill into the original design
+or the oracle when the baseline entry alone leaves a gap.
 
 ## 9. Re-read-before-edit rule
 
@@ -412,18 +416,18 @@ breaking if a keyword or data key it references is later renamed or removed by u
 
 Every baseline entry's State follows the same two-stage shape, per action:
 
-| Action | Pending (qa-analyst sets, at merge time) | Confirmed (qa-analyst sets, at script-review approval) |
+| Action | Pending (qa-analyst sets, at merge time) | Confirmed (script-reviewer sets, on `scripts_approved`) |
 |---|---|---|
 | NEW | `planned` | `active` |
 | MODIFIES | `modify_pending_REQ[N]` | `modified_by_REQ[N]` |
 | REMOVE | `remove_pending_REQ[N]` | `removed_by_REQ[N]` |
 
-- **`tester` only ever sees pending states** — that's its worklist. It never edits the State field
-  itself; its job ends at implementing and reporting back.
-- **qa-analyst's Script review mode is the only place pending flips to confirmed** — on a
-  `scripts_approved` verdict, after verifying a REMOVE case is actually absent and a NEW/MODIFY
-  case is actually present and correct. `make e2e-baseline` is a read-only drift-guard afterward,
-  never a confirmation trigger.
+- **`automation-engineer` only ever sees pending states** — that's its worklist. It never edits
+  the State field itself; its job ends at implementing and reporting back.
+- **`script-reviewer` is the only place pending flips to confirmed** — on a `scripts_approved`
+  verdict, after verifying a REMOVE case is actually absent and a NEW/MODIFY case is actually
+  present and correct. `make baseline` is a read-only drift-guard afterward, never a
+  confirmation trigger.
 - **Confirmed states persist** — `modified_by_REQ[N]`/`removed_by_REQ[N]` do not revert to
   `active` and do not expire. A later REQ that touches the same entry again simply overwrites the
   State with its own new transition. This is what lets anyone answer "what did REQ[N] touch?" at

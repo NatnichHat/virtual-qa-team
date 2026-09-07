@@ -5,7 +5,7 @@
 ## Project type
 - SUT ownership:                 external — this repo does NOT contain the system under test
 - Test basis source:             human documentation (Confluence / screens / walkthroughs) — NOT machine-readable
-- Test levels in scope:          API, UI (Browser), DB verification, Integration (third-party)
+- Test levels in scope:          API, DB verification, Integration (third-party) — UI/Browser is out of scope
 - Primary deliverable:           `docs/test_cases/REQ*/US*/test_cases.csv` (Excel-readable, for humans)
 
 ## Test basis
@@ -40,7 +40,7 @@
 - exception_coverage_min:        0.90
 - endpoint_status_coverage_min:  0.90
 - validation_rule_coverage_min:  0.90
-- automation_coverage_min:       <TBD — agree at /init; typical 0.70 for P1+P2 cases>
+- automation_coverage_min:       0.90  (90% of P1+P2 cases — user explicitly chose 90% over the 0.70 default)
 - coverage_cmd:                  `make coverage` → `python3 scripts/gate/coverage-report.py`
 - **The denominators are ratified by a human at G2 before any case is written.** See `coverage-model.md`.
 
@@ -65,7 +65,10 @@
                                  wired as `Test Setup`. Bracket notation only (`${Test_Data}[a][b]`).
 - e2e_features_catalog:          `tests/e2e/FEATURES.md` — coarse (~6–10) catalog; additions are human-ratified
 - e2e_baseline:                  `docs/test_cases/TEST_BASELINE.md` — 1 project = 1 baseline
-- container_runtime:             <TBD — Podman or Docker; always drive it via Makefile targets, never directly>
+- container_runtime:             not applicable — no local stack exists; `local` points at the SIT deployment
+                                 (same URLs as SIT). WireMock is not available anywhere; destructive cases
+                                 are blocked on all environments (shared). Drive any future container via
+                                 Makefile targets, never directly.
 - e2e_external_mock:             WireMock — `tests/e2e/config/wiremock/mappings/<service>-<scenario>.json`.
                                  **Local-only** — sit/uat talk to the real third party, same as production.
 - db_verification:               `DatabaseLibrary` via `environment.yaml`'s `database` block +
@@ -93,9 +96,9 @@
 - e2e_select_by_tag:             `make e2e-run INCLUDE=<tag>` — select by tag (US ID, `E2E-*` ID, `feature:<name>`,
                                  `env:<env>`), never by folder/filename. Routed through the same runner so a
                                  tag-selected run keeps zero-skip enforcement.
-- start_local_cmd:               <TBD — how the SUT is brought up locally, if at all. This repo does NOT own
-                                 the SUT: `local` may mean "point at a dev deployment" rather than "compose it".
-                                 Decide at /init and record in docs/env_matrix.md.>
+- start_local_cmd:               none — there is no local compose stack. `local` is a pointer at the SIT
+                                 deployment (same URLs as SIT, selected via `environment.yaml`). See
+                                 `docs/env_matrix.md` for the per-endpoint table and VPN prerequisite.
 
 ## Tags (the traceability vocabulary — nothing is traced by path)
 - `E2E-REQ{N}-US{N}-{running}`   the automation ID; **MUST be in `[Tags]`**, not only the name/`[Documentation]`
@@ -118,8 +121,9 @@
 ## Defect triage
 - triage_protocol_ref:           `.claude/refs/triage-protocol.md`
 - triage_output:                 `docs/defects/<run-id>/triage.md` + one Triage Record per failure
-- defect_tracker:                <TBD — Jira project key / other; fill at /init>
-- severity_scale:                <TBD — e.g. S1 Critical / S2 Major / S3 Minor / S4 Cosmetic>
+- defect_tracker:                Jira project key **EKC** — one project for both stories and defects;
+                                 `fetch-jira.py` and G7 ticketing both use EKC.
+- severity_scale:                S1 Critical / S2 Major / S3 Minor / S4 Cosmetic
 - min_evidence_per_classification: 2   # a classification with fewer than 2 pieces of evidence is invalid
 
 ## Forbidden patterns (machine-checkable — enforced by gate_cmd_scripts)
