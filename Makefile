@@ -1,4 +1,4 @@
-.PHONY: help validate coverage testcases testcases-check expected-lock expected-drift gate gate-scripts gate-artifacts \
+.PHONY: help validate coverage testcases testcases-check tcm-matrix expected-lock expected-drift gate gate-scripts gate-artifacts \
         e2e-deps e2e-seed e2e-seed-down e2e-run e2e-dryrun e2e-up e2e-down start-local baseline baseline-check
 
 # ENV selects the target for anything that talks to a running system.
@@ -11,6 +11,7 @@ help:
 	@echo "Artifacts"
 	@echo "  make testcases        generate test_cases.csv from design_notes.md"
 	@echo "  make testcases-check  fail if a CSV was hand-edited (drift guard)"
+	@echo "  make tcm-matrix       generate tcm_matrix.csv (X-mapping) from design_notes.md; STORY=<dir>"
 	@echo "  make validate         artifact validator — the pre-check behind every human gate"
 	@echo "  make coverage         specification coverage against the G2-ratified denominators"
 	@echo "  make expected-lock    snapshot approved expected results (G4 approval only)"
@@ -35,6 +36,11 @@ testcases:
 
 testcases-check:
 	@python3 scripts/tc/build-csv.py --check
+
+# tcm_matrix.csv is the wide X-mapping Coverage Matrix, derived from design_notes.md's Derivation
+# tables (never hand-typed — see .claude/refs/coverage-model.md). STORY=docs/test_cases/REQ.../US...
+tcm-matrix:
+	@python3 scripts/tc/build-tcm-matrix.py --story $(STORY)
 
 validate:
 	@python3 scripts/gate/validate-artifacts.py

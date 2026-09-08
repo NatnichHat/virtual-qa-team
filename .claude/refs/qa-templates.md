@@ -166,8 +166,14 @@ Show the work. A reviewer must be able to see WHY these cases and not others —
 not carry that, and without it the review degenerates into reading a list.
 
 ### Equivalence classes
-| Field | Valid classes | Invalid classes | Cases |
-|---|---|---|---|
+**`Rule` is the source for `validation_rule` coverage** (`coverage-model.md` dimension 3) — the
+named rule in `test_basis.md` → Validation rules this class exercises (e.g. `VAL-evidence-001`).
+Leave it `—` only when the class checks something `test_basis.md` has no named rule for (e.g. a
+bare type/shape check with no documented business rule behind it) — an empty `Rule` column excludes
+that row from the dimension entirely, so don't leave it blank out of habit.
+
+| Field | Rule | Valid classes | Invalid classes | Cases |
+|---|---|---|---|---|
 
 ### Boundary analysis
 **This table is the denominator for `boundary_coverage`.** A boundary you fail to list here does not
@@ -201,6 +207,19 @@ declined-vs-deferred distinction — they are not the same and must not be recor
 
 One block per case. `build-csv.py` parses these — keep the field names and order exactly.
 
+**These fields are copied into a CSV cell verbatim — write plain text, not markdown:**
+- No backtick code-spans in `Preconditions`, `Test data`, a step's action line, or `Postcondition`.
+  Backticks have no meaning to a reviewer reading the CSV in Excel, and `build-csv.py` does not
+  strip them — they leak into the cell as literal `` ` `` characters. (`` `Basis ref:` `` and the
+  per-step `` `Basis:` `` line, and a step's optional `` `[verification]` `` tag, ARE backtick-
+  wrapped in the examples below — that backtick is part of the syntax the parser matches on, not
+  a style choice; nowhere else.)
+- An exact-body JSON assertion in `Expected [CPn]:` is **compact** (`{"code":"0000",...}`, no
+  inserted spaces) — it is a byte-exact assertion, and pretty-printing invites a mismatch between
+  what is written here and what automation actually compares.
+- A citation like `(D24)` or `(BQ3/D26 — ...)` never lives inside `Expected [CPn]:` — that pollutes
+  the checkable assertion with derivation commentary. Put it in `Notes` instead.
+
 ### TC-REQ001-US001-001 — [name]
 - **AC:** AC-1
 - **Level:** api · **Type:** positive · **Technique:** EP · **Priority:** P1
@@ -208,10 +227,41 @@ One block per case. `build-csv.py` parses these — keep the field names and ord
 - **Preconditions:** [state the test assumes; seed data named, never created by the test]
 - **Test data:** [concrete values]
 - **Steps:**
-  1. [action] → **Expected:** [concrete, checkable outcome]
-  2. [action] → **Expected:** [...]
+
+  1. [action]
+
+     **Expected [CP1]:** [concrete, checkable outcome]
+
+     **Basis:** `test_basis.md#anchor-for-this-step`
+
+  2. [action] `[verification]`
+
+     **Expected [CP2]:** [...]
+
+     **Basis:** `test_basis.md#anchor-for-this-step`
+
 - **Postcondition:** [state afterwards, incl. cleanup]
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-001 · **Env scope:** local, sit, uat
+- **Notes:** [free text — D-numbers, BQ references, or other decision citations touching this
+  case; `-` if none. Maps straight to the CSV `Notes` column]
+
+**Steps, checkpoints, and basis — the exact contract `build-csv.py` parses:**
+- Every step is: a numbered action line, a **blank line**, an `**Expected [CPn]:**` line, a
+  **blank line**, a `**Basis:**` line, then a **blank line** before the next numbered step. `CPn`
+  numbers count up across the WHOLE case (not reset per step) — they are the checkpoint IDs a
+  reviewer or a failing Robot test refers to ("CP2 failed"), and they land as a `[CPn] ` prefix on
+  the generated CSV's `Expected_Result` cell.
+- `**Basis:**` is **per step** — `Basis_Ref` is declared a `step`-level field in `csv-schema.md`,
+  and a multi-step case routinely proves each step against a different part of `test_basis.md` (a
+  POST and the inquiry that verifies it are two different endpoints, two different anchors). Give
+  every step its own `**Basis:**` line; a step that genuinely shares its parent case's top-level
+  `- **Basis ref:**` may omit the line and it is reused as that step's default — but do not rely on
+  the default for a step that calls a different endpoint than the case's primary one.
+- Append `` `[verification]` `` to a step's action line when that step exists only to confirm a
+  side effect (e.g. an inquiry call checking a photo was not overwritten) rather than exercising
+  the behaviour this case is designed to prove. This excludes the step from the `endpoint × status`
+  coverage dimension (`coverage-model.md` §2) — it keeps the assertion (still a real, checked step)
+  without inflating a denominator the step was never meant to count toward.
 
 ## Spec change log
 
@@ -232,16 +282,39 @@ valid only with a citation proving the OLD expectation was wrong.
 
 ## `tcm.md` template — written by `qa-analyst`, per story
 
+**Coverage Matrix is generated, not hand-typed.** Run
+`make tcm-matrix STORY=docs/test_cases/REQ[ID]_.../US[ID]` (or
+`python3 scripts/tc/build-tcm-matrix.py --story <dir>`) **after** `make testcases` — it reads the
+`design_notes.md` Derivation tables you already wrote (Equivalence classes, Boundary analysis,
+Decision table(s), State transitions, Exception coverage) plus `AC_Ref` from
+`test_cases_index.csv`, and inverts each table's "Cases" column into `tcm_matrix.csv`: one row per
+`Test_Case_ID`, one column per dimension-value, lowercase `x` where that case's own derivation
+cites that value. **This is the same "derived, not chosen" control from
+`.claude/refs/coverage-model.md` #1** — applied to the X-matrix itself: a dimension-value that
+never appears in a Derivation table's "Cases" column cannot silently gain an `x`, and the script
+warns on stderr about any dimension column with zero `x` (a real, visible shortfall — record it in
+`## Spec non-compliance`, don't just delete the column).
+
+The Derivation tables must cite cases in their "Cases"/"Case"/"Covered by" column for this to work:
+- Equivalence classes / Boundary analysis: tag each case against the specific class/value it proves
+  — `TC-001 (VC1), TC-003 (IC1)` — not just a bare list. An untagged Boundary "Cases" cell is only
+  safe when it lists exactly one case per boundary column, left to right in column order.
+- Decision table: the existing `**case**` row already maps one case per rule column — no change.
+- State transitions: tag which arrow each case proves when a From-row has more than one valid
+  To-state — `TC-018 (→Failed 104001)`.
+- Exception coverage: the existing `Covered by` column already lists cases per catalog row.
+
 ```markdown
 # US[ID] — Test Coverage Matrix
 
 **Story:** US[ID] · **Requirement:** REQ[ID]
 **TCM Status:** `draft` | `reconciled`
+**Coverage Matrix:** `tcm_matrix.csv` (generated — see `make tcm-matrix`, do not hand-edit)
 
 ## State & boundary analysis
 
 Enumerate every input, variable, and state BEFORE counting. This is the source table for
-`boundary_coverage`.
+`boundary_coverage`, AND the source `design_notes.md` → Boundary analysis cites cases against.
 
 | Variable / input | Type | Valid | Invalid | Boundary | Null / empty |
 |---|---|---|---|---|---|
@@ -255,14 +328,14 @@ Enumerate every input, variable, and state BEFORE counting. This is the source t
 | endpoints | | test_basis.md (confirmed rows only) |
 | status_codes | | [list each endpoint's codes] |
 | request_fields | | [list each] |
-| validation_rules | | [list each RULE — a field with 2 rules contributes 2] |
+| validation_rules | | count of `tcm_matrix.csv`'s `RULE ·` columns (one per distinct `Rule` value in the Equivalence classes table — a rule proven by 5 classes is still 1 column) |
 | error_codes | | [list each] |
 | db_writes | | [list each] |
 | db_constraints | | [list each — 0 for read-only stories] |
-| boundaries | | [from the table above] |
-| decision_rules | | [feasible rules only] |
-| transitions | | [valid + reachable-invalid] |
-| exceptions | | [applicable catalog rows] |
+| boundaries | | count of VALUES in `tcm_matrix.csv`'s `BVA ·` columns — every boundary row's min−1/min/max/max+1 cell, not just the field count |
+| decision_rules | | count of `tcm_matrix.csv`'s `DT (...) ·` columns |
+| transitions | | count of `tcm_matrix.csv`'s `ST ·` columns — includes BOTH `(valid)` and `(invalid — must be rejected)` |
+| exceptions | | count of `tcm_matrix.csv`'s `EXC ...` columns |
 | screens | | [context only — NOT a term in min_UI] |
 | ui_states | | [per screen, then summed — never max, never average] |
 | ui_interactions | | [list each] |
@@ -289,25 +362,23 @@ there is no multiplication. Write the zeros — a dropped term is invisible, a `
 
 ## Coverage ratios
 
-Per `.claude/refs/coverage-model.md`. Denominators ratified at G2 on [date].
+Per `.claude/refs/coverage-model.md`. Denominators ratified at G2 on [date]. For every dimension
+except `automation`, Covered/Total = the count of `tcm_matrix.csv` columns of that dimension's
+prefix group that have ≥1 `x` / the count of columns in that group — **count them from the file, do
+not retype a number you didn't just count.**
 
-| Dimension | Covered | Total | Ratio | Threshold | Status |
-|---|---|---|---|---|---|
-| AC | | | | 1.00 | |
-| endpoint × status | | | | 0.90 | |
-| validation rule | | | | 0.90 | |
-| boundary | | | | 0.90 | |
-| decision rule | | | | 0.90 | |
-| state transition | | | | 0.90 | |
-| exception | | | | 0.90 | |
-| automation | | | | | |
+| Dimension | Covered | Total | Ratio | Threshold | Status | `tcm_matrix.csv` group |
+|---|---|---|---|---|---|---|
+| AC | | | | 1.00 | | `AC ·` |
+| endpoint × status | | | | 0.90 | | `END ·` |
+| validation rule | | | | 0.90 | | `RULE ·` |
+| boundary | | | | 0.90 | | `BVA ·` |
+| decision rule | | | | 0.90 | | `DT (...) ·` |
+| state transition | | | | 0.90 | | `ST ·` |
+| exception | | | | 0.90 | | `EXC ...` |
+| automation | | | | | | _(from `test_cases.csv` `Automatable`/`Automation_ID`, not the matrix)_ |
 
 **Excluded from denominators** (basis `Confidence` != `confirmed`): [list, or "none"]
-
-## AC → test traceability
-
-| AC | Input setup | Expected output | api | db | ui | e2e | Covered |
-|---|---|---|---|---|---|---|---|
 
 ## Level justification
 

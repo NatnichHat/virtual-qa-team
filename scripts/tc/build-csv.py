@@ -38,9 +38,13 @@ INDEX_COLUMNS = [c for c in COLUMNS if c not in ("Step_No", "Test_Step", "Expect
 
 CASE_HEADING = re.compile(r"^###\s+(TC-REQ\d+-US\d+-\d+)\s*[—-]\s*(.+?)\s*$")
 FIELD = re.compile(r"^-\s+\*\*(?P<key>[^*]+?):\*\*\s*(?P<val>.*)$")
-STEP = re.compile(
-    r"^\s*(?P<no>\d+)\.\s+(?P<step>.+?)\s+→\s+\*\*Expected:\*\*\s+(?P<exp>.+?)\s*$"
-)
+# A step is three lines: a numbered action, a blank line, "**Expected [CPn]:** ..." on its own
+# line, a blank line, "**Basis:** `anchor`" on its own line — see qa-templates.md's "Steps,
+# checkpoints, and basis" note for why each of those is its own line rather than one long one.
+STEP_NO = re.compile(r"^\s*(?P<no>\d+)\.\s+(?P<action>.+?)\s*$")
+STEP_EXPECTED = re.compile(r"^\s*\*\*Expected\s*\[CP(?P<cp>\d+)\]:\*\*\s*(?P<exp>.+?)\s*$")
+STEP_BASIS = re.compile(r"^\s*\*\*Basis:\*\*\s*`(?P<basis>[^`]+)`\s*$")
+VERIFICATION_TAG = re.compile(r"`\[verification\]`\s*$")
 ID_PARTS = re.compile(r"^TC-(REQ\d+)-(US\d+)-\d+$")
 
 
@@ -66,6 +70,7 @@ def parse_design_notes(path):
     cases = []
     current = None
     in_cases = False
+    in_steps = False
 
     with open(path, encoding="utf-8") as fh:
         lines = fh.readlines()
@@ -78,6 +83,7 @@ def parse_design_notes(path):
             if not in_cases and current:
                 cases.append(current)
                 current = None
+            in_steps = False
             continue
         if not in_cases:
             continue
@@ -96,6 +102,7 @@ def parse_design_notes(path):
             if not parts:
                 raise ParseError(f"{path}:{lineno}: malformed test case ID {m.group(1)!r}")
             current["REQ_ID"], current["US_ID"] = parts.group(1), parts.group(2)
+            in_steps = False
             continue
 
         if current is None:
@@ -104,6 +111,7 @@ def parse_design_notes(path):
         m = FIELD.match(line)
         if m:
             key, val = m.group("key").strip().lower(), m.group("val").strip()
+            in_steps = (key == "steps")
             if key == "ac":
                 current["AC_Ref"] = val
             elif key == "basis ref":
@@ -114,8 +122,10 @@ def parse_design_notes(path):
                 current["Test_Data"] = val
             elif key == "postcondition":
                 current["Postcondition"] = val
+            elif key == "notes":
+                current["Notes"] = val
             elif key == "steps":
-                pass  # steps follow as a numbered list
+                pass  # steps follow as numbered blocks, handled below
             else:
                 inline = _split_inline(f"{m.group('key').strip()}: {val}")
                 mapping = {
@@ -129,13 +139,28 @@ def parse_design_notes(path):
                         current[mapping[k]] = v.strip("`")
             continue
 
-        m = STEP.match(line)
+        if not in_steps or not line.strip():
+            continue
+
+        m = STEP_NO.match(line)
         if m:
+            action = VERIFICATION_TAG.sub("[verification]", m.group("action").strip())
             current["steps"].append({
                 "Step_No": m.group("no"),
-                "Test_Step": m.group("step").strip(),
-                "Expected_Result": m.group("exp").strip(),
+                "Test_Step": action,
+                "Expected_Result": "",
             })
+            continue
+
+        m = STEP_EXPECTED.match(line)
+        if m and current["steps"]:
+            current["steps"][-1]["Expected_Result"] = f"[CP{m.group('cp')}] {m.group('exp').strip()}"
+            continue
+
+        m = STEP_BASIS.match(line)
+        if m and current["steps"]:
+            current["steps"][-1]["Basis_Ref"] = m.group("basis").strip()
+            continue
 
     if current:
         cases.append(current)
@@ -148,10 +173,15 @@ def rows_for(cases, source):
     for case in cases:
         if not case["steps"]:
             raise ParseError(
-                f"{source}:{case['_line']}: {case['Test_Case_ID']} has no steps — "
-                "every case needs at least one `N. action → **Expected:** outcome` line"
+                f"{source}:{case['_line']}: {case['Test_Case_ID']} has no steps — every case "
+                "needs at least one numbered action followed by an `**Expected [CPn]:**` line"
             )
         for step in case["steps"]:
+            if not step["Expected_Result"]:
+                raise ParseError(
+                    f"{source}:{case['_line']}: {case['Test_Case_ID']} step {step['Step_No']} "
+                    "has no `**Expected [CPn]:**` line — every numbered step needs one"
+                )
             row = {c: "" for c in COLUMNS}
             for k, v in case.items():
                 if k in row:

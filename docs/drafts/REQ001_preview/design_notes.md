@@ -13,21 +13,28 @@ Show the work. A reviewer must be able to see WHY these cases and not others.
 
 ### Equivalence classes
 
-| Field | Valid classes | Invalid classes | Cases |
-|---|---|---|---|
-| `information.evidencePhoto` (base64 string) | VC1: valid base64 → valid JPEG ≤ 500 KB | IC1: not base64-decodable | TC-001 (VC1), TC-003 (IC1) |
-| | VC2: valid base64 → valid PNG ≤ 500 KB | IC2: valid base64 → GIF bytes | TC-002 (VC2), TC-004 (IC2) |
-| | VC3: absent / null / empty (optional for BaaS — D5) | IC3: valid base64 → WebP bytes | TC-014/015/016 (VC3), TC-005 (IC3) |
-| | | IC4: valid base64 → BMP bytes | TC-006 (IC4) |
-| | | IC5: valid base64 → random bytes (magic-bytes mismatch, D27) | TC-007 (IC5) |
-| | | IC6: truncated base64 (missing padding) | TC-012 (IC6) |
-| | | IC7: whitespace-only string | TC-020 (IC7) |
-| | | IC8: wrong type (number instead of string) | TC-021 (IC8) |
-| | | IC9: unicode/emoji in base64 field | TC-022 (IC9) |
-| | | IC10: injection payload | TC-023 (IC10) |
-| `x-devops-key` header | VC4: valid DevOps API key | IC11: missing | TC-024 (IC11) |
-| | | IC12: expired | TC-025 (IC12) |
-| | | IC13: malformed | TC-026 (IC13) |
+**Rule** cites the `test_basis.md` → Validation rules anchor each class exercises — see
+`csv-schema.md` and `coverage-model.md` §2 dimension 3. A row's Valid and Invalid classes can sit
+under different rules (or no rule at all), so IC/VC pairs that differ are split across rows here —
+the blank Field/Valid/Invalid cells are continuations of the row above, same as before.
+
+| Field | Rule | Valid classes | Invalid classes | Cases |
+|---|---|---|---|---|
+| `information.evidencePhoto` (base64 string) | VAL-evidence-001 | VC1: valid base64 → valid JPEG ≤ 500 KB | IC1: not base64-decodable | TC-001 (VC1), TC-003 (IC1) |
+| | VAL-evidence-001 | VC2: valid base64 → valid PNG ≤ 500 KB | IC2: valid base64 → GIF bytes | TC-002 (VC2), TC-004 (IC2) |
+| | — | VC3: absent / null / empty (optional for BaaS — D5) | | TC-014/015/016 (VC3) |
+| | VAL-evidence-001 | | IC3: valid base64 → WebP bytes | TC-005 (IC3) |
+| | VAL-evidence-001 | | IC4: valid base64 → BMP bytes | TC-006 (IC4) |
+| | VAL-evidence-001 | | IC5: valid base64 → random bytes (magic-bytes mismatch, D27) | TC-007 (IC5) |
+| | VAL-evidence-001 | | IC6: truncated base64 (missing padding) | TC-012 (IC6) |
+| | VAL-evidence-001 | | IC7: whitespace-only string | TC-020 (IC7) |
+| | — | | IC8: wrong type (number instead of string — schema-level shape, BQ1, not documented under VAL-evidence-001) | TC-021 (IC8) |
+| | VAL-evidence-001 | | IC9: unicode/emoji in base64 field | TC-022 (IC9) |
+| | VAL-evidence-001 | | IC10: injection payload | TC-023 (IC10) |
+| `x-devops-key` header | — | VC4: valid DevOps API key | | |
+| | — | | IC11: missing | TC-024 (IC11) |
+| | — | | IC12: expired | TC-025 (IC12) |
+| | — | | IC13: malformed | TC-026 (IC13) |
 
 ### Boundary analysis
 
@@ -152,397 +159,644 @@ One block per case. `build-csv.py` parses these — keep the field names and ord
 ### TC-REQ001-US001-001 — Valid JPEG evidencePhoto, nominal size, success
 - **AC:** AC-1
 - **Level:** api · **Type:** positive · **Technique:** EP · **Priority:** P2
-- **Basis ref:** `test_basis.md#post-dipchip-v3`, `test_basis.md#VAL-evidence-001`, `test_basis.md#VAL-evidence-002`
+- **Basis ref:** `test_basis.md#post-dipchip-v3`
 - **Preconditions:** Valid BaaS headers (x-channel: BAAS, x-devops-src: BAAS, x-product, x-devops-dest: ekyc, x-devops-key). SIT VPN connected.
-- **Test data:** `information.evidencePhoto` = base64-encoded valid JPEG image, decoded size ~100 KB (well under 500 KB)
+- **Test data:** information.evidencePhoto = base64-encoded valid JPEG, decoded size ~100 KB
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto → **Expected:** HTTP 200; response body exactly `{ "code": "0000", "message": "Transaction Success", "description": "", "data": { "refId": "<uuid>" } }` (D24)
+
+  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto
+
+     **Expected [CP1]:** HTTP 200; response body exactly {"code":"0000","message":"Transaction Success","description":"","data":{"refId":"<uuid>"}}
+
+     **Basis:** `test_basis.md#post-dipchip-v3`
+
 - **Postcondition:** refId generated; photo stored to GCS bucket; tb_dipchip_info record written
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-001 · **Env scope:** sit
-- **Status:** READY
+- **Notes:** D24; D8
 
 ### TC-REQ001-US001-002 — Valid PNG evidencePhoto, nominal size, success
 - **AC:** AC-1
 - **Level:** api · **Type:** positive · **Technique:** EP · **Priority:** P2
-- **Basis ref:** `test_basis.md#post-dipchip-v3`, `test_basis.md#VAL-evidence-001`, `test_basis.md#VAL-evidence-002`
+- **Basis ref:** `test_basis.md#post-dipchip-v3`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected.
-- **Test data:** `information.evidencePhoto` = base64-encoded valid PNG image, decoded size ~100 KB
+- **Test data:** information.evidencePhoto = base64-encoded valid PNG, decoded size ~100 KB
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto → **Expected:** HTTP 200; response body exactly `{ "code": "0000", "message": "Transaction Success", "description": "", "data": { "refId": "<uuid>" } }` (D24)
+
+  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto
+
+     **Expected [CP1]:** HTTP 200; response body exactly {"code":"0000","message":"Transaction Success","description":"","data":{"refId":"<uuid>"}}
+
+     **Basis:** `test_basis.md#post-dipchip-v3`
+
 - **Postcondition:** refId generated; photo stored to GCS bucket
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-002 · **Env scope:** sit
-- **Status:** READY
+- **Notes:** D24
 
 ### TC-REQ001-US001-003 — Not valid base64 string, 104001
 - **AC:** AC-2a
 - **Level:** api · **Type:** negative · **Technique:** EP · **Priority:** P1
-- **Basis ref:** `test_basis.md#ERR-104001`, `test_basis.md#VAL-evidence-001`
+- **Basis ref:** `test_basis.md#ERR-104001`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected.
-- **Test data:** `information.evidencePhoto` = `"!!!not-valid-base64!!!"` (not base64-decodable)
+- **Test data:** information.evidencePhoto = "!!!not-valid-base64!!!" (not base64-decodable)
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto → **Expected:** HTTP 400; response body exactly `{ "code": "104001", "message": "Request is invalid format", "description": "image is invalid format" }` (D8, D11, D23)
+
+  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto
+
+     **Expected [CP1]:** HTTP 400; response body exactly {"code":"104001","message":"Request is invalid format","description":"image is invalid format"}
+
+     **Basis:** `test_basis.md#ERR-104001`
+
 - **Postcondition:** no photo uploaded; existing photo (if any) not overwritten
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-003 · **Env scope:** sit
-- **Status:** READY
+- **Notes:** D8; D11; D23
 
 ### TC-REQ001-US001-004 — Valid base64 of GIF bytes, 104001 (rejected format)
 - **AC:** AC-2b
 - **Level:** api · **Type:** negative · **Technique:** EP · **Priority:** P1
-- **Basis ref:** `test_basis.md#ERR-104001`, `test_basis.md#VAL-evidence-001`
+- **Basis ref:** `test_basis.md#ERR-104001`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected.
-- **Test data:** `information.evidencePhoto` = base64-encoded valid GIF image (decoded size < 500 KB)
+- **Test data:** information.evidencePhoto = base64-encoded valid GIF image (decoded size < 500 KB)
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto → **Expected:** HTTP 400; response body exactly `{ "code": "104001", "message": "Request is invalid format", "description": "image is invalid format" }` (D6, D8, D11, D23)
+
+  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto
+
+     **Expected [CP1]:** HTTP 400; response body exactly {"code":"104001","message":"Request is invalid format","description":"image is invalid format"}
+
+     **Basis:** `test_basis.md#ERR-104001`
+
 - **Postcondition:** no photo uploaded; existing photo (if any) not overwritten
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-004 · **Env scope:** sit
-- **Status:** READY
+- **Notes:** D6; D8; D11; D23
 
 ### TC-REQ001-US001-005 — Valid base64 of WebP bytes, 104001 (rejected format)
 - **AC:** AC-2b
 - **Level:** api · **Type:** negative · **Technique:** EP · **Priority:** P1
-- **Basis ref:** `test_basis.md#ERR-104001`, `test_basis.md#VAL-evidence-001`
+- **Basis ref:** `test_basis.md#ERR-104001`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected.
-- **Test data:** `information.evidencePhoto` = base64-encoded valid WebP image (decoded size < 500 KB)
+- **Test data:** information.evidencePhoto = base64-encoded valid WebP image (decoded size < 500 KB)
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto → **Expected:** HTTP 400; response body exactly `{ "code": "104001", "message": "Request is invalid format", "description": "image is invalid format" }` (D6, D8, D11, D23)
+
+  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto
+
+     **Expected [CP1]:** HTTP 400; response body exactly {"code":"104001","message":"Request is invalid format","description":"image is invalid format"}
+
+     **Basis:** `test_basis.md#ERR-104001`
+
 - **Postcondition:** no photo uploaded; existing photo (if any) not overwritten
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-005 · **Env scope:** sit
-- **Status:** READY
+- **Notes:** D6; D8; D11; D23
 
 ### TC-REQ001-US001-006 — Valid base64 of BMP bytes, 104001 (rejected format)
 - **AC:** AC-2b
 - **Level:** api · **Type:** negative · **Technique:** EP · **Priority:** P1
-- **Basis ref:** `test_basis.md#ERR-104001`, `test_basis.md#VAL-evidence-001`
+- **Basis ref:** `test_basis.md#ERR-104001`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected.
-- **Test data:** `information.evidencePhoto` = base64-encoded valid BMP image (decoded size < 500 KB)
+- **Test data:** information.evidencePhoto = base64-encoded valid BMP image (decoded size < 500 KB)
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto → **Expected:** HTTP 400; response body exactly `{ "code": "104001", "message": "Request is invalid format", "description": "image is invalid format" }` (D6, D8, D11, D23)
+
+  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto
+
+     **Expected [CP1]:** HTTP 400; response body exactly {"code":"104001","message":"Request is invalid format","description":"image is invalid format"}
+
+     **Basis:** `test_basis.md#ERR-104001`
+
 - **Postcondition:** no photo uploaded; existing photo (if any) not overwritten
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-006 · **Env scope:** sit
-- **Status:** READY
+- **Notes:** D6; D8; D11; D23
 
 ### TC-REQ001-US001-007 — Valid base64 of random bytes (magic-bytes mismatch), 104001
 - **AC:** AC-2b
 - **Level:** api · **Type:** negative · **Technique:** EP · **Priority:** P1
-- **Basis ref:** `test_basis.md#ERR-104001`, `test_basis.md#VAL-evidence-001`
+- **Basis ref:** `test_basis.md#ERR-104001`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected.
-- **Test data:** `information.evidencePhoto` = base64-encoded 1000 random bytes (decodes successfully but no valid image magic bytes — D27)
+- **Test data:** information.evidencePhoto = base64-encoded 1000 random bytes (decodes but no valid image magic bytes — D27)
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto → **Expected:** HTTP 400; response body exactly `{ "code": "104001", "message": "Request is invalid format", "description": "image is invalid format" }` (D27, D8, D11, D23)
+
+  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto
+
+     **Expected [CP1]:** HTTP 400; response body exactly {"code":"104001","message":"Request is invalid format","description":"image is invalid format"}
+
+     **Basis:** `test_basis.md#ERR-104001`
+
 - **Postcondition:** no photo uploaded; existing photo (if any) not overwritten
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-007 · **Env scope:** sit
-- **Status:** READY
+- **Notes:** D27; D8; D11; D23
 
 ### TC-REQ001-US001-008 — Decoded size exactly 500,000 bytes, accepted (boundary max, KB=1000)
-- **AC:** AC-3a, AC-1
+- **AC:** AC-3a;AC-1
 - **Level:** api · **Type:** boundary · **Technique:** BVA · **Priority:** P2
-- **Basis ref:** `test_basis.md#VAL-evidence-002`, `test_basis.md#post-dipchip-v3`
+- **Basis ref:** `test_basis.md#VAL-evidence-002`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected.
-- **Test data:** `information.evidencePhoto` = base64-encoded valid JPEG image, decoded size exactly 500,000 bytes
+- **Test data:** information.evidencePhoto = base64-encoded valid JPEG, decoded size exactly 500,000 bytes
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto → **Expected:** HTTP 200; response body exactly `{ "code": "0000", "message": "Transaction Success", "description": "", "data": { "refId": "<uuid>" } }` (D3 — exactly 500 KB accepted; D24)
+
+  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto
+
+     **Expected [CP1]:** HTTP 200; response body exactly {"code":"0000","message":"Transaction Success","description":"","data":{"refId":"<uuid>"}}
+
+     **Basis:** `test_basis.md#VAL-evidence-002`
+
 - **Postcondition:** refId generated; photo stored
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-008 · **Env scope:** sit
-- **Status:** READY (500,000 is under both 500,000 and 512,000 thresholds — accepted regardless of byte unit)
+- **Notes:** D3; D24 — 500,000 under both thresholds
 
 ### TC-REQ001-US001-009 — Decoded size 500,001 bytes, rejected (boundary max+1, KB=1000)
 - **AC:** AC-3a
 - **Level:** api · **Type:** boundary · **Technique:** BVA · **Priority:** P2
-- **Basis ref:** `test_basis.md#ERR-104010`, `test_basis.md#VAL-evidence-002`
+- **Basis ref:** `test_basis.md#ERR-104010`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected.
-- **Test data:** `information.evidencePhoto` = base64-encoded valid JPEG image, decoded size exactly 500,001 bytes
+- **Test data:** information.evidencePhoto = base64-encoded valid JPEG, decoded size exactly 500,001 bytes
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto → **Expected:** HTTP 400; response body exactly `{ "code": "104010", "message": "Image size exceeded", "description": "evidencePhoto size exceeded" }` (D3, D4, D8, D11, D23)
+
+  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto
+
+     **Expected [CP1]:** HTTP 400; response body exactly {"code":"104010","message":"Image size exceeded","description":"evidencePhoto size exceeded"}
+
+     **Basis:** `test_basis.md#ERR-104010`
+
 - **Postcondition:** no photo uploaded; existing photo (if any) not overwritten (D10)
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-009 · **Env scope:** sit
-- **Status:** PENDING-G0 (BQ3/D26 — if KB=1024, threshold is 512,000 and 500,001 is accepted, not rejected)
+- **Notes:** BQ3/D26 — if KB=1024, 500,001 is accepted
 
 ### TC-REQ001-US001-010 — Decoded size exactly 512,000 bytes, accepted (boundary max, KB=1024)
-- **AC:** AC-3a, AC-1
+- **AC:** AC-3a;AC-1
 - **Level:** api · **Type:** boundary · **Technique:** BVA · **Priority:** P2
-- **Basis ref:** `test_basis.md#VAL-evidence-002`, `test_basis.md#post-dipchip-v3`
+- **Basis ref:** `test_basis.md#VAL-evidence-002`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected.
-- **Test data:** `information.evidencePhoto` = base64-encoded valid JPEG image, decoded size exactly 512,000 bytes
+- **Test data:** information.evidencePhoto = base64-encoded valid JPEG, decoded size exactly 512,000 bytes
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto → **Expected:** HTTP 200; response body exactly `{ "code": "0000", "message": "Transaction Success", "description": "", "data": { "refId": "<uuid>" } }` (D3 — exactly 500 KB accepted; D24)
+
+  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto
+
+     **Expected [CP1]:** HTTP 200; response body exactly {"code":"0000","message":"Transaction Success","description":"","data":{"refId":"<uuid>"}}
+
+     **Basis:** `test_basis.md#VAL-evidence-002`
+
 - **Postcondition:** refId generated; photo stored
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-010 · **Env scope:** sit
-- **Status:** PENDING-G0 (BQ3/D26 — if KB=1000, threshold is 500,000 and 512,000 is rejected, not accepted)
+- **Notes:** BQ3/D26 — if KB=1000, 512,000 is rejected
 
 ### TC-REQ001-US001-011 — Decoded size 512,001 bytes, rejected (boundary max+1, KB=1024)
 - **AC:** AC-3a
 - **Level:** api · **Type:** boundary · **Technique:** BVA · **Priority:** P2
-- **Basis ref:** `test_basis.md#ERR-104010`, `test_basis.md#VAL-evidence-002`
+- **Basis ref:** `test_basis.md#ERR-104010`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected.
-- **Test data:** `information.evidencePhoto` = base64-encoded valid JPEG image, decoded size exactly 512,001 bytes
+- **Test data:** information.evidencePhoto = base64-encoded valid JPEG, decoded size exactly 512,001 bytes
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto → **Expected:** HTTP 400; response body exactly `{ "code": "104010", "message": "Image size exceeded", "description": "evidencePhoto size exceeded" }` (D4, D8, D11, D23)
+
+  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto
+
+     **Expected [CP1]:** HTTP 400; response body exactly {"code":"104010","message":"Image size exceeded","description":"evidencePhoto size exceeded"}
+
+     **Basis:** `test_basis.md#ERR-104010`
+
 - **Postcondition:** no photo uploaded; existing photo (if any) not overwritten (D10)
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-011 · **Env scope:** sit
-- **Status:** READY (512,001 is over both 500,000 and 512,000 thresholds — rejected regardless of byte unit)
+- **Notes:** D4; D8; D11; D23 — 512,001 over both thresholds
 
 ### TC-REQ001-US001-012 — Truncated base64 (missing padding), 104001
 - **AC:** AC-2a
 - **Level:** api · **Type:** negative · **Technique:** BVA · **Priority:** P1
-- **Basis ref:** `test_basis.md#ERR-104001`, `test_basis.md#VAL-evidence-001`
+- **Basis ref:** `test_basis.md#ERR-104001`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected.
-- **Test data:** `information.evidencePhoto` = `"iVBORw0KGgo"` (valid base64 prefix of PNG header but missing `==` padding — not decodable)
+- **Test data:** information.evidencePhoto = "iVBORw0KGgo" (valid PNG base64 prefix, missing == padding)
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto → **Expected:** HTTP 400; response body exactly `{ "code": "104001", "message": "Request is invalid format", "description": "image is invalid format" }` (D8, D11, D23)
+
+  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto
+
+     **Expected [CP1]:** HTTP 400; response body exactly {"code":"104001","message":"Request is invalid format","description":"image is invalid format"}
+
+     **Basis:** `test_basis.md#ERR-104001`
+
 - **Postcondition:** no photo uploaded; existing photo (if any) not overwritten
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-012 · **Env scope:** sit
-- **Status:** READY
+- **Notes:** D8; D11; D23
 
 ### TC-REQ001-US001-013 — Oversized AND undecodable, 104010 (size checked first)
-- **AC:** AC-3a, AC-2a
+- **AC:** AC-3a;AC-2a
 - **Level:** api · **Type:** negative · **Technique:** DT · **Priority:** P1
-- **Basis ref:** `test_basis.md#VAL-order-001`, `test_basis.md#ERR-104010`
+- **Basis ref:** `test_basis.md#VAL-order-001`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected.
-- **Test data:** `information.evidencePhoto` = string of 700,000 random characters (not valid base64, and if decoded would exceed 500 KB)
+- **Test data:** information.evidencePhoto = string of 700,000 random characters (not valid base64, would exceed 500 KB if decoded)
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto → **Expected:** HTTP 400; response body exactly `{ "code": "104010", "message": "Image size exceeded", "description": "evidencePhoto size exceeded" }` (D7 — size checked before decoding; D27 — validation order; D8, D11, D23)
+
+  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto
+
+     **Expected [CP1]:** HTTP 400; response body exactly {"code":"104010","message":"Image size exceeded","description":"evidencePhoto size exceeded"}
+
+     **Basis:** `test_basis.md#VAL-order-001`
+
 - **Postcondition:** no photo uploaded; existing photo (if any) not overwritten (D10)
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-013 · **Env scope:** sit
-- **Status:** READY
+- **Notes:** D7; D27; D8; D11; D23
 
 ### TC-REQ001-US001-014 — evidencePhoto absent, processed without photo (optional for BaaS)
 - **AC:** AC-1
 - **Level:** api · **Type:** exception · **Technique:** DT · **Priority:** P2
-- **Basis ref:** `test_basis.md#post-dipchip-v3`, `US001#AC-1`
+- **Basis ref:** `test_basis.md#post-dipchip-v3`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected.
-- **Test data:** Request body with `information` object but NO `evidencePhoto` field present
+- **Test data:** Request body with information object but NO evidencePhoto field present
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with valid BaaS headers, no evidencePhoto field → **Expected:** HTTP 200; response body exactly `{ "code": "0000", "message": "Transaction Success", "description": "", "data": { "refId": "<uuid>" } }` (D5 — optional for BaaS; D24)
+
+  1. POST /orch/api/v1/dipchip with valid BaaS headers, no evidencePhoto field
+
+     **Expected [CP1]:** HTTP 200; response body exactly {"code":"0000","message":"Transaction Success","description":"","data":{"refId":"<uuid>"}}
+
+     **Basis:** `test_basis.md#post-dipchip-v3`
+
 - **Postcondition:** refId generated; no photo uploaded (none provided)
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-014 · **Env scope:** sit
-- **Status:** PENDING-G0 (BQ6/D5 — BaaS-optional behaviour needs SUT confirmation at G0)
+- **Notes:** BQ6/D5 — BaaS-optional behaviour needs SUT confirmation
 
 ### TC-REQ001-US001-015 — evidencePhoto null, processed without photo
 - **AC:** AC-1
 - **Level:** api · **Type:** exception · **Technique:** DT · **Priority:** P2
-- **Basis ref:** `test_basis.md#post-dipchip-v3`, `US001#AC-1`
+- **Basis ref:** `test_basis.md#post-dipchip-v3`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected.
-- **Test data:** `information.evidencePhoto` = `null`
+- **Test data:** information.evidencePhoto = null
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto=null → **Expected:** HTTP 200; response body exactly `{ "code": "0000", "message": "Transaction Success", "description": "", "data": { "refId": "<uuid>" } }` (D5; D24)
+
+  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto=null
+
+     **Expected [CP1]:** HTTP 200; response body exactly {"code":"0000","message":"Transaction Success","description":"","data":{"refId":"<uuid>"}}
+
+     **Basis:** `test_basis.md#post-dipchip-v3`
+
 - **Postcondition:** refId generated; no photo uploaded
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-015 · **Env scope:** sit
-- **Status:** PENDING-G0 (BQ6/D5)
+- **Notes:** BQ6/D5
 
 ### TC-REQ001-US001-016 — evidencePhoto empty string, processed without photo
 - **AC:** AC-1
 - **Level:** api · **Type:** exception · **Technique:** DT · **Priority:** P2
-- **Basis ref:** `test_basis.md#post-dipchip-v3`, `US001#AC-1`
+- **Basis ref:** `test_basis.md#post-dipchip-v3`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected.
-- **Test data:** `information.evidencePhoto` = `""` (empty string)
+- **Test data:** information.evidencePhoto = "" (empty string)
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto="" → **Expected:** HTTP 200; response body exactly `{ "code": "0000", "message": "Transaction Success", "description": "", "data": { "refId": "<uuid>" } }` (D5; D24)
+
+  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto=""
+
+     **Expected [CP1]:** HTTP 200; response body exactly {"code":"0000","message":"Transaction Success","description":"","data":{"refId":"<uuid>"}}
+
+     **Basis:** `test_basis.md#post-dipchip-v3`
+
 - **Postcondition:** refId generated; no photo uploaded
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-016 · **Env scope:** sit
-- **Status:** PENDING-G0 (BQ6/D5)
+- **Notes:** BQ6/D5
 
-### TC-REQ001-US001-017 — State transition: 0001 Initiate → 0002 Processing → 0000 Success
+### TC-REQ001-US001-017 — State transition: 0001 Initiate -> 0002 Processing -> 0000 Success
 - **AC:** AC-1
 - **Level:** api · **Type:** positive · **Technique:** ST · **Priority:** P2
-- **Basis ref:** `test_basis.md#post-dipchip-v3`, `test_basis.md#SE-evidence-001`
+- **Basis ref:** `test_basis.md#post-dipchip-v3`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected. No existing record for the test citizen.
-- **Test data:** `information.evidencePhoto` = base64-encoded valid JPEG, decoded size ~100 KB
+- **Test data:** information.evidencePhoto = base64-encoded valid JPEG, decoded size ~100 KB
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto → **Expected:** HTTP 200; response body exactly `{ "code": "0000", "message": "Transaction Success", "description": "", "data": { "refId": "<uuid>" } }` (D24, D28 — 0001→0002→0000)
-  2. POST /orch/api/v1/dipchip-inquiry by refId from step 1 → **Expected:** HTTP 200; response shows dipchip record in state 0000 (Success) with imagePath populated (D29)
+
+  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto
+
+     **Expected [CP1]:** HTTP 200; response body exactly {"code":"0000","message":"Transaction Success","description":"","data":{"refId":"<uuid>"}}
+
+     **Basis:** `test_basis.md#post-dipchip-v3`
+
+  2. POST /orch/api/v1/dipchip-inquiry by refId from step 1 `[verification]`
+
+     **Expected [CP2]:** HTTP 200; response shows dipchip record in state 0000 (Success) with imagePath populated
+
+     **Basis:** `test_basis.md#post-dipchip-inquiry-v3`
+
 - **Postcondition:** record in tb_dipchip_info with state 0000; photo in GCS bucket
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-017 · **Env scope:** sit
-- **Status:** READY
+- **Notes:** D24; D28
 
-### TC-REQ001-US001-018 — State transition: 0001 Initiate → 0002 Processing → Failed (104001)
+### TC-REQ001-US001-018 — State transition: 0001 Initiate -> 0002 Processing -> Failed (104001)
 - **AC:** AC-2a
 - **Level:** api · **Type:** negative · **Technique:** ST · **Priority:** P1
-- **Basis ref:** `test_basis.md#ERR-104001`, `test_basis.md#SE-evidence-002`
+- **Basis ref:** `test_basis.md#ERR-104001`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected.
-- **Test data:** `information.evidencePhoto` = `"!!!not-valid-base64!!!"`
+- **Test data:** information.evidencePhoto = "!!!not-valid-base64!!!"
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto → **Expected:** HTTP 400; response body exactly `{ "code": "104001", "message": "Request is invalid format", "description": "image is invalid format" }` (D28 — 0001→0002→Failed; D8, D11, D23)
-- **Postcondition:** process in Failed state; no photo uploaded; existing photo not overwritten (SE-evidence-002)
-- **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-018 · **Env scope:** sit
-- **Status:** READY
 
-### TC-REQ001-US001-019 — State transition: 0001 Initiate → 0002 Processing → Failed (104010)
+  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto
+
+     **Expected [CP1]:** HTTP 400; response body exactly {"code":"104001","message":"Request is invalid format","description":"image is invalid format"}
+
+     **Basis:** `test_basis.md#ERR-104001`
+
+- **Postcondition:** process in Failed state; no photo uploaded; existing photo not overwritten
+- **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-018 · **Env scope:** sit
+- **Notes:** D28; D8; D11; D23
+
+### TC-REQ001-US001-019 — State transition: 0001 Initiate -> 0002 Processing -> Failed (104010)
 - **AC:** AC-3a
 - **Level:** api · **Type:** negative · **Technique:** ST · **Priority:** P2
-- **Basis ref:** `test_basis.md#ERR-104010`, `test_basis.md#SE-evidence-003`
+- **Basis ref:** `test_basis.md#ERR-104010`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected.
-- **Test data:** `information.evidencePhoto` = base64-encoded valid JPEG, decoded size 512,001 bytes
+- **Test data:** information.evidencePhoto = base64-encoded valid JPEG, decoded size 512,001 bytes
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto → **Expected:** HTTP 400; response body exactly `{ "code": "104010", "message": "Image size exceeded", "description": "evidencePhoto size exceeded" }` (D28 — 0001→0002→Failed; D8, D11, D23)
-- **Postcondition:** process in Failed state; no photo uploaded; existing photo not overwritten (SE-evidence-003, D10)
+
+  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto
+
+     **Expected [CP1]:** HTTP 400; response body exactly {"code":"104010","message":"Image size exceeded","description":"evidencePhoto size exceeded"}
+
+     **Basis:** `test_basis.md#ERR-104010`
+
+- **Postcondition:** process in Failed state; no photo uploaded; existing photo not overwritten (D10)
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-019 · **Env scope:** sit
-- **Status:** READY
+- **Notes:** D28; D8; D11; D23
 
 ### TC-REQ001-US001-020 — Whitespace-only evidencePhoto, 104001
 - **AC:** AC-2a
 - **Level:** api · **Type:** exception · **Technique:** EG · **Priority:** P1
-- **Basis ref:** `test_basis.md#ERR-104001`, `test_basis.md#VAL-evidence-001`
+- **Basis ref:** `test_basis.md#ERR-104001`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected.
-- **Test data:** `information.evidencePhoto` = `"   "` (three spaces — not empty, not valid base64)
+- **Test data:** information.evidencePhoto = "   " (three spaces — not empty, not valid base64)
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto → **Expected:** HTTP 400; response body exactly `{ "code": "104001", "message": "Request is invalid format", "description": "image is invalid format" }` (D8, D11, D23)
+
+  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto
+
+     **Expected [CP1]:** HTTP 400; response body exactly {"code":"104001","message":"Request is invalid format","description":"image is invalid format"}
+
+     **Basis:** `test_basis.md#ERR-104001`
+
 - **Postcondition:** no photo uploaded; existing photo (if any) not overwritten
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-020 · **Env scope:** sit
-- **Status:** READY
+- **Notes:** D8; D11; D23
 
 ### TC-REQ001-US001-021 — Wrong type: evidencePhoto as number, 400
 - **AC:** AC-2a
 - **Level:** api · **Type:** exception · **Technique:** EG · **Priority:** P1
-- **Basis ref:** `test_basis.md#post-dipchip-v3`, `test_basis.md#VAL-evidence-001`
+- **Basis ref:** `test_basis.md#post-dipchip-v3`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected.
-- **Test data:** `information.evidencePhoto` = `12345` (number, not string)
+- **Test data:** information.evidencePhoto = 12345 (number, not string)
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto=12345 → **Expected:** HTTP 400; response body contains code "104001" or schema-validation error (exact body depends on schema validation — basis does not document schema-level error shape separately, BQ1)
+
+  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto=12345
+
+     **Expected [CP1]:** HTTP 400; response body contains code "104001" or schema-validation error
+
+     **Basis:** `test_basis.md#post-dipchip-v3`
+
 - **Postcondition:** no photo uploaded
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-021 · **Env scope:** sit
-- **Status:** READY (expected result is partially specified — schema-level error shape is BQ1, but HTTP 400 is concrete)
+- **Notes:** HTTP 400 concrete; exact body depends on BQ1
 
 ### TC-REQ001-US001-022 — Unicode in evidencePhoto field, 104001
 - **AC:** AC-2a
 - **Level:** api · **Type:** exception · **Technique:** EG · **Priority:** P1
-- **Basis ref:** `test_basis.md#ERR-104001`, `test_basis.md#VAL-evidence-001`
+- **Basis ref:** `test_basis.md#ERR-104001`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected.
-- **Test data:** `information.evidencePhoto` = `"🎨📸🖼️"` (emoji — not valid base64)
+- **Test data:** information.evidencePhoto = emoji string (not valid base64)
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto → **Expected:** HTTP 400; response body exactly `{ "code": "104001", "message": "Request is invalid format", "description": "image is invalid format" }` (D8, D11, D23)
+
+  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto
+
+     **Expected [CP1]:** HTTP 400; response body exactly {"code":"104001","message":"Request is invalid format","description":"image is invalid format"}
+
+     **Basis:** `test_basis.md#ERR-104001`
+
 - **Postcondition:** no photo uploaded
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-022 · **Env scope:** sit
-- **Status:** READY
+- **Notes:** D8; D11; D23
 
 ### TC-REQ001-US001-023 — SQL injection payload in evidencePhoto, 104001 or safely handled
 - **AC:** AC-2a
 - **Level:** api · **Type:** security · **Technique:** EG · **Priority:** P1
-- **Basis ref:** `test_basis.md#ERR-104001`, `test_basis.md#VAL-evidence-001`
+- **Basis ref:** `test_basis.md#ERR-104001`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected.
-- **Test data:** `information.evidencePhoto` = `"' OR 1=1; DROP TABLE tb_dipchip_info; --"` (SQL injection — not valid base64)
+- **Test data:** information.evidencePhoto = SQL injection string (not valid base64)
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto → **Expected:** HTTP 400; response body exactly `{ "code": "104001", "message": "Request is invalid format", "description": "image is invalid format" }` (D8, D11, D23 — rejected as invalid format, never executed)
+
+  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto
+
+     **Expected [CP1]:** HTTP 400; response body exactly {"code":"104001","message":"Request is invalid format","description":"image is invalid format"}
+
+     **Basis:** `test_basis.md#ERR-104001`
+
 - **Postcondition:** no photo uploaded; tb_dipchip_info intact
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-023 · **Env scope:** sit
-- **Status:** READY
+- **Notes:** D8; D11; D23 — rejected, never executed
 
 ### TC-REQ001-US001-024 — Missing x-devops-key header, 401
 - **AC:** AC-1
 - **Level:** api · **Type:** exception · **Technique:** EG · **Priority:** P1
 - **Basis ref:** `test_basis.md#post-dipchip-v3`
 - **Preconditions:** BaaS headers WITHOUT x-devops-key. SIT VPN connected.
-- **Test data:** `information.evidencePhoto` = base64-encoded valid JPEG ~100 KB
+- **Test data:** information.evidencePhoto = base64-encoded valid JPEG ~100 KB
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with BaaS headers but no x-devops-key → **Expected:** HTTP 401 (auth failure — B1)
+
+  1. POST /orch/api/v1/dipchip with BaaS headers but no x-devops-key
+
+     **Expected [CP1]:** HTTP 401 (auth failure)
+
+     **Basis:** `test_basis.md#post-dipchip-v3`
+
 - **Postcondition:** no request processed
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-024 · **Env scope:** sit
-- **Status:** READY
+- **Notes:** B1
 
 ### TC-REQ001-US001-025 — Expired x-devops-key, 401
 - **AC:** AC-1
 - **Level:** api · **Type:** exception · **Technique:** EG · **Priority:** P1
 - **Basis ref:** `test_basis.md#post-dipchip-v3`
 - **Preconditions:** BaaS headers with an expired x-devops-key value. SIT VPN connected.
-- **Test data:** `information.evidencePhoto` = base64-encoded valid JPEG ~100 KB; x-devops-key = expired credential
+- **Test data:** information.evidencePhoto = base64-encoded valid JPEG ~100 KB; x-devops-key = expired credential
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with expired x-devops-key → **Expected:** HTTP 401 (auth failure — B2, distinct from B1)
+
+  1. POST /orch/api/v1/dipchip with expired x-devops-key
+
+     **Expected [CP1]:** HTTP 401 (auth failure, distinct from B1)
+
+     **Basis:** `test_basis.md#post-dipchip-v3`
+
 - **Postcondition:** no request processed
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-025 · **Env scope:** sit
-- **Status:** READY
+- **Notes:** B2
 
 ### TC-REQ001-US001-026 — Malformed x-devops-key, 401
 - **AC:** AC-1
 - **Level:** api · **Type:** exception · **Technique:** EG · **Priority:** P1
 - **Basis ref:** `test_basis.md#post-dipchip-v3`
 - **Preconditions:** BaaS headers with a malformed x-devops-key value. SIT VPN connected.
-- **Test data:** `information.evidencePhoto` = base64-encoded valid JPEG ~100 KB; x-devops-key = `"not-a-real-key-!!!"`
+- **Test data:** information.evidencePhoto = base64-encoded valid JPEG ~100 KB; x-devops-key = "not-a-real-key-!!!"
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with malformed x-devops-key → **Expected:** HTTP 401 (auth failure — B3, never 500)
+
+  1. POST /orch/api/v1/dipchip with malformed x-devops-key
+
+     **Expected [CP1]:** HTTP 401 (auth failure, never 500)
+
+     **Basis:** `test_basis.md#post-dipchip-v3`
+
 - **Postcondition:** no request processed
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-026 · **Env scope:** sit
-- **Status:** READY
+- **Notes:** B3 — never 500
 
 ### TC-REQ001-US001-027 — Valid photo success, verify side effects (GCS + DB)
 - **AC:** AC-1
 - **Level:** db · **Type:** positive · **Technique:** ST · **Priority:** P2
-- **Basis ref:** `test_basis.md#SE-evidence-001`, `test_basis.md#SE-evidence-004`
+- **Basis ref:** `test_basis.md#post-dipchip-v3`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected. No existing record for the test citizen.
-- **Test data:** `information.evidencePhoto` = base64-encoded valid JPEG ~100 KB
+- **Test data:** information.evidencePhoto = base64-encoded valid JPEG ~100 KB
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto → **Expected:** HTTP 200; response body exactly `{ "code": "0000", "message": "Transaction Success", "description": "", "data": { "refId": "<uuid>" } }` (D24)
-  2. POST /orch/api/v1/dipchip-inquiry by refId from step 1 → **Expected:** HTTP 200; response shows record with imagePath populated (photo stored in GCS bucket `dipchip-image-ktbgov-uat`, tb_dipchip_info row written — SE-evidence-001, SE-evidence-004, D29)
+
+  1. POST /orch/api/v1/dipchip with valid BaaS headers and evidencePhoto
+
+     **Expected [CP1]:** HTTP 200; response body exactly {"code":"0000","message":"Transaction Success","description":"","data":{"refId":"<uuid>"}}
+
+     **Basis:** `test_basis.md#post-dipchip-v3`
+
+  2. POST /orch/api/v1/dipchip-inquiry by refId from step 1 `[verification]`
+
+     **Expected [CP2]:** HTTP 200; response shows record with imagePath populated (photo in GCS bucket dipchip-image-ktbgov-uat, tb_dipchip_info row written)
+
+     **Basis:** `test_basis.md#SE-evidence-001`
+
 - **Postcondition:** record in tb_dipchip_info with imagePath; photo in GCS bucket
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-027 · **Env scope:** sit
-- **Status:** READY
+- **Notes:** SE-evidence-001; SE-evidence-004; D29
 
 ### TC-REQ001-US001-028 — Non-overwrite: pre-existing photo, invalid base64, original preserved (black-box)
 - **AC:** AC-2c
 - **Level:** db · **Type:** negative · **Technique:** ST · **Priority:** P1
-- **Basis ref:** `test_basis.md#SE-evidence-002`, `test_basis.md#post-dipchip-inquiry-v3`, `test_basis.md#post-trusted-source-inquiry`
-- **Preconditions:** Valid BaaS headers. SIT VPN connected. A previously stored evidence photo EXISTS for the test citizen (from a prior successful submission).
-- **Test data:** `information.evidencePhoto` = `"!!!not-valid-base64!!!"`; pre-existing photo refId/citizenId known
+- **Basis ref:** `test_basis.md#post-dipchip-inquiry-v3`
+- **Preconditions:** Valid BaaS headers. SIT VPN connected. A previously stored evidence photo EXISTS for the test citizen.
+- **Test data:** information.evidencePhoto = "!!!not-valid-base64!!!"; pre-existing photo citizenId known
 - **Steps:**
-  1. POST /orch/api/v1/dipchip-inquiry by citizenId → **Expected:** HTTP 200; capture the existing imagePath/photo reference (D29)
-  2. POST /orch/api/v1/dipchip with valid BaaS headers and invalid evidencePhoto → **Expected:** HTTP 400; response body exactly `{ "code": "104001", "message": "Request is invalid format", "description": "image is invalid format" }` (D8, D11, D23)
-  3. POST /orch/api/v1/dipchip-inquiry by citizenId → **Expected:** HTTP 200; response shows the SAME imagePath/photo reference as step 1 — NOT overwritten (SE-evidence-002, D29)
-  4. POST /customer/v1/biometric/trusted-source-image/inquiry by citizenId → **Expected:** HTTP 200; response shows the SAME active vault image as before step 2 — NOT overwritten (D29)
+
+  1. POST /orch/api/v1/dipchip-inquiry by citizenId `[verification]`
+
+     **Expected [CP1]:** HTTP 200; capture the existing imagePath/photo reference
+
+     **Basis:** `test_basis.md#post-dipchip-inquiry-v3`
+
+  2. POST /orch/api/v1/dipchip with valid BaaS headers and invalid evidencePhoto
+
+     **Expected [CP2]:** HTTP 400; response body exactly {"code":"104001","message":"Request is invalid format","description":"image is invalid format"}
+
+     **Basis:** `test_basis.md#ERR-104001`
+
+  3. POST /orch/api/v1/dipchip-inquiry by citizenId `[verification]`
+
+     **Expected [CP3]:** HTTP 200; response shows the SAME imagePath as step 1 — NOT overwritten
+
+     **Basis:** `test_basis.md#SE-evidence-002`
+
+  4. POST /customer/v1/biometric/trusted-source-image/inquiry by citizenId `[verification]`
+
+     **Expected [CP4]:** HTTP 200; response shows the SAME active vault image as before step 2 — NOT overwritten
+
+     **Basis:** `test_basis.md#post-trusted-source-inquiry`
+
 - **Postcondition:** original photo preserved in GCS bucket and vault
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-028 · **Env scope:** sit
-- **Status:** READY
+- **Notes:** SE-evidence-002; D29
 
 ### TC-REQ001-US001-029 — Non-overwrite: pre-existing photo, wrong format (GIF), original preserved (black-box)
-- **AC:** AC-2c, AC-2b
+- **AC:** AC-2c;AC-2b
 - **Level:** db · **Type:** negative · **Technique:** ST · **Priority:** P1
-- **Basis ref:** `test_basis.md#SE-evidence-002`, `test_basis.md#post-dipchip-inquiry-v3`, `test_basis.md#post-trusted-source-inquiry`
+- **Basis ref:** `test_basis.md#post-dipchip-inquiry-v3`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected. A previously stored evidence photo EXISTS for the test citizen.
-- **Test data:** `information.evidencePhoto` = base64-encoded valid GIF < 500 KB; pre-existing photo citizenId known
+- **Test data:** information.evidencePhoto = base64-encoded valid GIF < 500 KB; pre-existing photo citizenId known
 - **Steps:**
-  1. POST /orch/api/v1/dipchip-inquiry by citizenId → **Expected:** HTTP 200; capture existing imagePath (D29)
-  2. POST /orch/api/v1/dipchip with valid BaaS headers and GIF evidencePhoto → **Expected:** HTTP 400; response body exactly `{ "code": "104001", "message": "Request is invalid format", "description": "image is invalid format" }` (D6, D8, D11, D23)
-  3. POST /orch/api/v1/dipchip-inquiry by citizenId → **Expected:** HTTP 200; response shows SAME imagePath as step 1 — NOT overwritten (SE-evidence-002, D29)
+
+  1. POST /orch/api/v1/dipchip-inquiry by citizenId `[verification]`
+
+     **Expected [CP1]:** HTTP 200; capture existing imagePath
+
+     **Basis:** `test_basis.md#post-dipchip-inquiry-v3`
+
+  2. POST /orch/api/v1/dipchip with valid BaaS headers and GIF evidencePhoto
+
+     **Expected [CP2]:** HTTP 400; response body exactly {"code":"104001","message":"Request is invalid format","description":"image is invalid format"}
+
+     **Basis:** `test_basis.md#ERR-104001`
+
+  3. POST /orch/api/v1/dipchip-inquiry by citizenId `[verification]`
+
+     **Expected [CP3]:** HTTP 200; response shows SAME imagePath as step 1 — NOT overwritten
+
+     **Basis:** `test_basis.md#SE-evidence-002`
+
 - **Postcondition:** original photo preserved
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-029 · **Env scope:** sit
-- **Status:** READY
+- **Notes:** SE-evidence-002; D29
 
 ### TC-REQ001-US001-030 — Non-overwrite: pre-existing photo, oversized, original preserved (black-box)
-- **AC:** AC-2c, AC-3a
+- **AC:** AC-2c;AC-3a
 - **Level:** db · **Type:** negative · **Technique:** ST · **Priority:** P1
-- **Basis ref:** `test_basis.md#SE-evidence-003`, `test_basis.md#post-dipchip-inquiry-v3`, `test_basis.md#post-trusted-source-inquiry`
+- **Basis ref:** `test_basis.md#post-dipchip-inquiry-v3`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected. A previously stored evidence photo EXISTS for the test citizen.
-- **Test data:** `information.evidencePhoto` = base64-encoded valid JPEG, decoded size 512,001 bytes; pre-existing photo citizenId known
+- **Test data:** information.evidencePhoto = base64-encoded valid JPEG, decoded size 512,001 bytes; pre-existing photo citizenId known
 - **Steps:**
-  1. POST /orch/api/v1/dipchip-inquiry by citizenId → **Expected:** HTTP 200; capture existing imagePath (D29)
-  2. POST /orch/api/v1/dipchip with valid BaaS headers and oversized evidencePhoto → **Expected:** HTTP 400; response body exactly `{ "code": "104010", "message": "Image size exceeded", "description": "evidencePhoto size exceeded" }` (D8, D11, D23)
-  3. POST /orch/api/v1/dipchip-inquiry by citizenId → **Expected:** HTTP 200; response shows SAME imagePath as step 1 — NOT overwritten (SE-evidence-003, D10, D29)
+
+  1. POST /orch/api/v1/dipchip-inquiry by citizenId `[verification]`
+
+     **Expected [CP1]:** HTTP 200; capture existing imagePath
+
+     **Basis:** `test_basis.md#post-dipchip-inquiry-v3`
+
+  2. POST /orch/api/v1/dipchip with valid BaaS headers and oversized evidencePhoto
+
+     **Expected [CP2]:** HTTP 400; response body exactly {"code":"104010","message":"Image size exceeded","description":"evidencePhoto size exceeded"}
+
+     **Basis:** `test_basis.md#ERR-104010`
+
+  3. POST /orch/api/v1/dipchip-inquiry by citizenId `[verification]`
+
+     **Expected [CP3]:** HTTP 200; response shows SAME imagePath as step 1 — NOT overwritten
+
+     **Basis:** `test_basis.md#SE-evidence-003`
+
 - **Postcondition:** original photo preserved
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-030 · **Env scope:** sit
-- **Status:** READY
+- **Notes:** SE-evidence-003; D10; D29
 
 ### TC-REQ001-US001-031 — Non-overwrite: pre-existing photo, invalid, DB imagePath untouched (white-box)
 - **AC:** AC-2c
 - **Level:** db · **Type:** negative · **Technique:** ST · **Priority:** P1
-- **Basis ref:** `test_basis.md#SE-evidence-004`, `test_basis.md#post-dipchip-inquiry-v3`
-- **Preconditions:** Valid BaaS headers. SIT VPN connected. A previously stored evidence photo EXISTS for the test citizen. Read-only DB access to tb_dipchip_info provisioned.
-- **Test data:** `information.evidencePhoto` = `"!!!not-valid-base64!!!"`; pre-existing photo citizenId known
+- **Basis ref:** `test_basis.md#SE-evidence-004`
+- **Preconditions:** Valid BaaS headers. SIT VPN connected. A previously stored evidence photo EXISTS. Read-only DB access to tb_dipchip_info provisioned.
+- **Test data:** information.evidencePhoto = "!!!not-valid-base64!!!"; pre-existing photo citizenId known
 - **Steps:**
-  1. Query tb_dipchip_info by citizen_id_hashed → **Expected:** capture existing imagePath and timestamps (D29)
-  2. POST /orch/api/v1/dipchip with valid BaaS headers and invalid evidencePhoto → **Expected:** HTTP 400; response body exactly `{ "code": "104001", "message": "Request is invalid format", "description": "image is invalid format" }` (D8, D11, D23)
-  3. Query tb_dipchip_info by citizen_id_hashed → **Expected:** imagePath and timestamps are IDENTICAL to step 1 — completely untouched (SE-evidence-004, D29)
+
+  1. Query tb_dipchip_info by citizen_id_hashed `[verification]`
+
+     **Expected [CP1]:** capture existing imagePath and timestamps
+
+     **Basis:** `test_basis.md#SE-evidence-004`
+
+  2. POST /orch/api/v1/dipchip with valid BaaS headers and invalid evidencePhoto
+
+     **Expected [CP2]:** HTTP 400; response body exactly {"code":"104001","message":"Request is invalid format","description":"image is invalid format"}
+
+     **Basis:** `test_basis.md#ERR-104001`
+
+  3. Query tb_dipchip_info by citizen_id_hashed `[verification]`
+
+     **Expected [CP3]:** imagePath and timestamps are IDENTICAL to step 1 — completely untouched
+
+     **Basis:** `test_basis.md#SE-evidence-004`
+
 - **Postcondition:** DB row unchanged
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-031 · **Env scope:** sit
-- **Status:** PENDING-G0 (BQ15/D29 — read-only DB access not yet provisioned)
+- **Notes:** BQ15/D29 — DB read access not yet provisioned
 
 ### TC-REQ001-US001-032 — Invalid state transition: replay stale refId, 409 or error
 - **AC:** AC-2a
 - **Level:** api · **Type:** exception · **Technique:** ST · **Priority:** P1
 - **Basis ref:** `test_basis.md#post-dipchip-v3`
 - **Preconditions:** Valid BaaS headers. SIT VPN connected. A previously completed (state 0000) dipchip request with known refId.
-- **Test data:** Stale refId from a prior successful submission; `information.evidencePhoto` = base64-encoded valid JPEG ~100 KB
+- **Test data:** Stale refId from prior successful submission; information.evidencePhoto = base64-encoded valid JPEG ~100 KB
 - **Steps:**
-  1. POST /orch/api/v1/dipchip with valid BaaS headers, attempting to reuse/replay a stale request context → **Expected:** HTTP 409 or documented error (C3 — cannot re-process without a new request; exact error code not documented in basis, BQ1)
+
+  1. POST /orch/api/v1/dipchip with valid BaaS headers, attempting to reuse/replay a stale request context
+
+     **Expected [CP1]:** HTTP 409 or documented error (cannot re-process without a new request)
+
+     **Basis:** `test_basis.md#post-dipchip-v3`
+
 - **Postcondition:** no new record created; no photo overwritten
 - **Automatable:** Y · **Automation ID:** E2E-REQ001-US001-032 · **Env scope:** sit
-- **Status:** READY (expected HTTP status is concrete; exact error body depends on BQ1 — noted in Spec non-compliance)
+- **Notes:** C3; exact error body depends on BQ1
 
 ## Spec change log
 

@@ -4,6 +4,7 @@
 
 **Story:** US001 · **Requirement:** REQ001
 **TCM Status:** `draft`
+**Coverage Matrix:** `tcm_matrix.csv` (generated — `make tcm-matrix STORY=docs/drafts/REQ001_preview`, do not hand-edit)
 
 ## State & boundary analysis
 
@@ -34,7 +35,7 @@ Enumerate every input, variable, and state BEFORE counting. This is the source t
 | error_codes | 2 | 104001 (invalid format); 104010 (size exceeded) |
 | db_writes | 2 | GCS bucket write (SE-evidence-001); tb_dipchip_info write (SE-evidence-004). Non-overwrite guarantees (SE-evidence-002/003) are negative-side-effect assertions. |
 | db_constraints | 0 | read-only verification for AC-2c; no DDL constraints tested |
-| boundaries | 4 | 500,000 bytes (max, KB=1000); 500,001 bytes (max+1, KB=1000); 512,000 bytes (max, KB=1024); 512,001 bytes (max+1, KB=1024) |
+| boundaries | 9 | 500,000/500,001 (KB=1000 max/max+1); 512,000/512,001 (KB=1024 max/max+1); truncated base64 (max); presence absent/null/empty/whitespace (min-1/min/max/max+1) — corrected from an earlier manual count of 4 that only included the two size thresholds; `tcm_matrix.csv`'s `BVA ·` columns count every value in the State & boundary analysis table above, per `coverage-model.md` §2 |
 | decision_rules | 5 | R1 (absent → processed without photo); R2 (size > 500KB → 104010); R3 (not decodable → 104001); R4 (wrong format → 104001); R5 (valid → success) |
 | transitions | 12 | 3 valid (0001→0002, 0002→0000, 0002→Failed) + 9 reachable-invalid (full 4×4 matrix minus self-transitions and the 3 valid) |
 | exceptions | 14 | A1, A2, A3, A4, A5, A6, A9, A11, A13, B1, B2, B3, C3, F1 (after 30 documented declines) |
@@ -51,34 +52,48 @@ there is no multiplication. Write the zeros — a dropped term is invisible, a `
 
 | Category | Formula | Minimum | Actual | Delta | Status |
 |---|---|---|---|---|---|
-| api | status_codes + validation_rules + error_codes + boundaries + decision_rules | 2 + 3 + 2 + 4 + 5 = 16 | 27 | +11 | PASS |
+| api | status_codes + validation_rules + error_codes + boundaries + decision_rules | 2 + 3 + 2 + 9 + 5 = 21 | 27 | +6 | PASS |
 | db | db_constraints + db_writes | 0 + 2 = 2 | 5 | +3 | PASS |
 | ui | ui_states + ui_interactions + journey_failures_visible | 0 + 0 + 0 = 0 | 0 | 0 | PASS (n/a) |
 | e2e | journeys + journey_failures | 0 + 0 = 0 | 0 | 0 | PASS (n/a) |
 | exception | exceptions | 14 | 14 | 0 | PASS |
 | **TOTAL** | | **32** | **32** | **0** | **PASS** |
 
-> The 11 extra api cases beyond the minimum cover: 2 format-rejection variants (WebP, BMP beyond
-> the minimum 1), 1 magic-bytes mismatch (D27), 1 truncated base64 boundary, 1 combined
-> oversized+undecodable (validation order), 3 absent/null/empty optional-field cases, 1
-> whitespace exception, 1 wrong-type exception, 1 unicode exception, 1 injection exception. Each
-> exercises a distinct code path or equivalence class.
+> The 6 extra api cases beyond the (now-corrected) minimum cover: 2 format-rejection variants
+> (WebP, BMP beyond the minimum 1), 1 magic-bytes mismatch (D27), 1 combined oversized+undecodable
+> case (validation order), 1 wrong-type exception, 1 injection exception. Each exercises a
+> distinct code path or equivalence class beyond what the boundary/decision-rule minimum already
+> requires.
 
 ## Coverage ratios
 
 Per `.claude/refs/coverage-model.md`. **Denominators are NOT G2-ratified — these are preview
 estimates for shape review.**
 
-| Dimension | Covered | Total | Ratio | Threshold | Status |
-|---|---|---|---|---|---|
-| AC | 5 | 5 | 1.00 | 1.00 | PASS |
-| endpoint × status | 2 | 2 | 1.00 | 0.90 | PASS |
-| validation rule | 3 | 3 | 1.00 | 0.90 | PASS |
-| boundary | 4 | 4 | 1.00 | 0.90 | PASS |
-| decision rule | 5 | 5 | 1.00 | 0.90 | PASS |
-| state transition | 3 | 12 | 0.25 | 0.90 | FAIL (preview — see note) |
-| exception | 14 | 14 | 1.00 | 0.90 | PASS |
-| automation | 32 | 32 | 1.00 | per stack | PASS |
+| Dimension | Covered | Total | Ratio | Threshold | Status | `tcm_matrix.csv` group |
+|---|---|---|---|---|---|---|
+| AC | 5 | 5 | 1.00 | 1.00 | PASS | `AC ·` |
+| endpoint × status | 2 | 2 | 1.00 | 0.90 | PASS | `END ·` |
+| validation rule | 3 | 3 | 1.00 | 0.90 | PASS | `RULE ·` |
+| boundary | 9 | 9 | 1.00 | 0.90 | PASS | `BVA ·` |
+| decision rule | 5 | 5 | 1.00 | 0.90 | PASS | `DT (...) ·` |
+| state transition | 3 | 12 | 0.25 | 0.90 | FAIL (preview — see note) | `ST ·` |
+| exception | 14 | 14 | 1.00 | 0.90 | PASS | `EXC ...` |
+| automation | 32 | 32 | 1.00 | per stack | PASS | _(from test_cases.csv)_ |
+
+**Boundary corrected 4→9:** an earlier manual count only listed the two 500 KB/512 KB size
+thresholds. `tcm_matrix.csv`'s `BVA ·` columns count every value in the State & boundary analysis
+table above, including the truncated-base64 boundary and the four presence values
+(absent/null/empty/whitespace) — all still 100% covered, so the ratio and PASS status don't change.
+
+**Endpoint × status and validation rule are now machine-derived too, and both land exactly on the
+original hand-counted numbers (2/2 and 3/3).** `END ·` columns exclude any step tagged
+`` `[verification]` `` (an inquiry/query call made only to confirm a side effect, not to exercise
+the endpoint under test) and any case whose `Test_Type` is `exception` (already counted in the
+`exception` dimension — an auth/replay status should not inflate two denominators). `RULE ·`
+columns come from the Equivalence classes table's new `Rule` column, with `Basis_Ref`/`Notes`
+citations of a `VAL-*` anchor as a backstop for rules like `VAL-order-001` that are proven by a
+combined scenario rather than a single field's value. See `.claude/refs/coverage-model.md` §2.
 
 **State transition note:** The 3/12 ratio reflects that REQ001 directly exercises only the
 evidence-photo validation transitions (0001→0002, 0002→0000, 0002→Failed). The remaining 9
@@ -90,15 +105,39 @@ require separate lifecycle stories. This shortfall is recorded in ## Spec non-co
 ratios. For this preview, we compute against the `inferred` rows to show shape — the actual G2
 denominators will be ratified after G0 confirmation.
 
-## AC → test traceability
+## Coverage Matrix
 
-| AC | Input setup | Expected output | api | db | ui | e2e | Covered |
-|---|---|---|---|---|---|---|---|
-| AC-1 | valid evidencePhoto (JPEG/PNG ≤ 500 KB) | HTTP 200, code "0000", refId returned | TC-001, TC-002, TC-008, TC-010, TC-014, TC-015, TC-016, TC-017 | TC-027 | — | — | YES |
-| AC-2a | evidencePhoto not base64-decodable | HTTP 400, exact 104001 body | TC-003, TC-012, TC-018, TC-020, TC-022, TC-023, TC-032 | TC-028, TC-031 | — | — | YES |
-| AC-2b | evidencePhoto decodes but wrong format | HTTP 400, exact 104001 body | TC-004, TC-005, TC-006, TC-007 | TC-029 | — | — | YES |
-| AC-2c | fails validation + pre-existing photo exists | previously stored image NOT overwritten | — | TC-028, TC-029, TC-030, TC-031 | — | — | YES |
-| AC-3a | evidencePhoto size > 500 KB | HTTP 400, exact 104010 body | TC-008, TC-009, TC-010, TC-011, TC-013, TC-019 | TC-030 | — | — | YES |
+`tcm_matrix.csv` (32 test cases × 67 dimension columns) replaces the narrative AC → traceability
+table this section used to carry by hand. It is generated — never hand-edited — by
+`scripts/tc/build-tcm-matrix.py`, which inverts the "Cases" columns already present in this file's
+Derivation tables (Equivalence classes, Boundary analysis, Decision table, State transitions,
+Exception coverage) plus `AC_Ref` from `test_cases_index.csv` into one dimension-value per column,
+one `Test_Case_ID` per row, lowercase `x` where that case's own derivation cites that value.
+
+Regenerate after any change to `design_notes.md` or `test_cases.csv`:
+
+```
+python3 scripts/tc/build-csv.py --story docs/drafts/REQ001_preview   # test_cases.csv first
+make tcm-matrix STORY=docs/drafts/REQ001_preview                     # then tcm_matrix.csv
+```
+
+(`make testcases` with no `STORY=` also works once this story moves under `docs/test_cases/` — it
+walks every story directory there. It has no `STORY=` argument itself; use `--story` directly, or
+`make tcm-matrix STORY=<dir>` which does support it, for a single draft directory like this one.)
+
+Column groups, by prefix: `AC ·` (5 — acceptance criteria), `END ·` (2 — endpoint × status pairs,
+excludes `[verification]` steps and `exception`-type cases), `RULE ·` (3 — named validation rules
+from `test_basis.md`), `EP ·` (17 — equivalence classes, derivation detail; not one of the 8
+`coverage-model.md` dimensions on its own), `BVA ·` (9 — boundary values),
+`DT (evidencePhoto validation outcome) ·` (5 — decision rules), `ST ·` (12 — state transitions,
+both valid and invalid), `EXC ...` (14 — exception catalog rows). Every dimension column had ≥1 `x`
+when this was generated (`build-tcm-matrix` warns on stderr otherwise), with two known exceptions:
+the 9 `ST ·` `(invalid — must be rejected)` columns, which are the correct, visible representation
+of the 9 reachable-invalid transitions recorded as deferred in `## Spec non-compliance` below; and
+one `EP · x-devops-key header = valid DevOps API key` column, which has zero `x` because no case
+tests "a valid key" as its own equivalence class — every non-401 case merely assumes one as a
+precondition. `EP` is derivation detail, not a `coverage-model.md` dimension, so this does not
+affect any Coverage ratio.
 
 ## Level justification
 
