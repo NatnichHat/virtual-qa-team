@@ -27,6 +27,20 @@
 - csv_delimiter:                 `,` — fields containing `,` `"` or newline are quoted per RFC 4180
 - csv_build_cmd:                 `make testcases` → `python3 scripts/tc/build-csv.py`
 - csv_check_cmd:                 `make testcases-check` → build to a temp file and diff; a difference is drift
+- xlsx_view_cmd:                 `make xlsx-view` → `python3 scripts/tc/build-xlsx.py` — renders
+                                 `test_cases.xlsx` (merge + colour) FROM the CSVs; presentation
+                                 only, gitignored, never read by a gate/script/agent. See
+                                 `.claude/refs/csv-schema.md` §The presentation view.
+- xlsx_preview_cmd:              `make xlsx-preview` → ALSO renders `xlsx_style_preview.xlsx` — the
+                                 same contiguous case slice under all three colour scopes
+                                 (cell_tint / row_tint / banding), one sheet each. Decide in Excel,
+                                 then set `color_scope` in the style config.
+- xlsx_style_config:             `scripts/tc/xlsx_style.toml` — presentation policy ONLY (merge set,
+                                 header shape, freeze pane, palettes, widths, colour scope). Never
+                                 affects CSV content; edit freely and re-render.
+- xlsx_deps_cmd:                 `make xlsx-deps` → one-time install of `scripts/requirements.txt`
+                                 (openpyxl) into `.venv/tools`; tooling deps, separate from
+                                 `tests/e2e/requirements.txt`
 - techniques_ref:                `.claude/refs/test-design-techniques.md`
 - exception_catalog_ref:         `.claude/refs/exception-catalog.md`
 - coverage_model_ref:            `.claude/refs/coverage-model.md`

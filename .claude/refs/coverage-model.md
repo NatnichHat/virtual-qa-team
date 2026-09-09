@@ -39,33 +39,34 @@ Three controls contain it. All three are mandatory:
 
 | # | Dimension | Numerator | Denominator (the named source table) | Threshold |
 |---|---|---|---|---|
-| 1 | **AC coverage** | `AC ·` columns in `tcm_matrix.csv` with ≥1 `x` | `AC ·` columns in `tcm_matrix.csv` | **1.00** |
-| 2 | **Endpoint × status** | `END ·` columns in `tcm_matrix.csv` with ≥1 `x` | `END ·` columns in `tcm_matrix.csv` | 0.90 |
-| 3 | **Validation rule** | `RULE ·` columns in `tcm_matrix.csv` with ≥1 `x` | `RULE ·` columns in `tcm_matrix.csv` | 0.90 |
-| 4 | **Boundary** | `BVA ·` columns in `tcm_matrix.csv` with ≥1 `x` | `BVA ·` columns in `tcm_matrix.csv` | 0.90 |
-| 5 | **Decision rule** | `DT (...) ·` columns in `tcm_matrix.csv` with ≥1 `x` | `DT (...) ·` columns in `tcm_matrix.csv` | 0.90 |
-| 6 | **State transition** | `ST ·` columns in `tcm_matrix.csv` with ≥1 `x` | `ST ·` columns in `tcm_matrix.csv` — **both** `(valid)` and `(invalid — must be rejected)` | 0.90 |
-| 7 | **Exception** | `EXC ...` columns in `tcm_matrix.csv` with ≥1 `x` | `EXC ...` columns in `tcm_matrix.csv` | 0.90 |
+| 1 | **AC coverage** | `AC ·` columns in `test_cases.csv`'s matrix block with ≥1 `x` | `AC ·` columns in `test_cases.csv`'s matrix block | **1.00** |
+| 2 | **Endpoint × status** | `END ·` columns in `test_cases.csv`'s matrix block with ≥1 `x` | `END ·` columns in `test_cases.csv`'s matrix block | 0.90 |
+| 3 | **Validation rule** | `RULE ·` columns in `test_cases.csv`'s matrix block with ≥1 `x` | `RULE ·` columns in `test_cases.csv`'s matrix block | 0.90 |
+| 4 | **Boundary** | `BVA ·` columns in `test_cases.csv`'s matrix block with ≥1 `x` | `BVA ·` columns in `test_cases.csv`'s matrix block | 0.90 |
+| 5 | **Decision rule** | `DT (...) ·` columns in `test_cases.csv`'s matrix block with ≥1 `x` | `DT (...) ·` columns in `test_cases.csv`'s matrix block | 0.90 |
+| 6 | **State transition** | `ST ·` columns in `test_cases.csv`'s matrix block with ≥1 `x` | `ST ·` columns in `test_cases.csv`'s matrix block — **both** `(valid)` and `(invalid — must be rejected)` | 0.90 |
+| 7 | **Exception** | `EXC ...` columns in `test_cases.csv`'s matrix block with ≥1 `x` | `EXC ...` columns in `test_cases.csv`'s matrix block | 0.90 |
 | 8 | **Automation** | cases with `Automatable=Y` that have a passing `Automation_ID` | cases with `Automatable=Y` | per `test_stack.md` |
 
 **AC coverage is 1.00, not 0.90.** An uncovered acceptance criterion is not a rounding error — it is
 a requirement nobody tested. The 90% bands exist for derived dimensions where the denominator is
 large and the tail is genuinely low-value; acceptance criteria have no such tail.
 
-All 8 dimensions are counted from **`tcm_matrix.csv`**, the wide X-mapping Coverage Matrix
-`scripts/tc/build-tcm-matrix.py` generates from `design_notes.md`'s own Derivation tables (never
-hand-typed — see `qa-templates.md`'s `tcm.md` template for exactly what each column means and how
-its `x` marks are derived), except dimension 8 (`automation`), which comes straight from
-`test_cases.csv`'s own `Automatable`/`Automation_ID` columns — it needs no X-mapping, it is already
-a per-case boolean. This does not weaken control #1 above; it moves the same rule one layer down —
-the matrix itself is derived from a named source (the Derivation tables' "Cases" columns), so a
-reviewer can recount either the ratio from the matrix, or the matrix from the derivation, in
-minutes.
+All 8 dimensions are counted from the **matrix block of `test_cases.csv`** — the wide X-mapping
+Coverage Matrix columns right of `Basis_Ref` (the case block's last column), which `make testcases` generates from `design_notes.md`'s
+own Derivation tables (never hand-typed — see `csv-schema.md` and `qa-templates.md`'s `tcm.md`
+template for exactly what each column means and how its `x` marks are derived), except dimension 8
+(`automation`), which comes straight from `test_cases.csv`'s own `Automatable`/`Automation_ID`
+columns in the same row — it needs no X-mapping, it is already a per-case boolean. The old
+standalone `tcm_matrix.csv` is retired; cases and their X-mapping now share one file and one row.
+This does not weaken control #1 above; it moves the same rule one layer down — the matrix itself is
+derived from a named source (the Derivation tables' "Cases" columns), so a reviewer can recount
+either the ratio from the matrix, or the matrix from the derivation, in minutes.
 
 Dimension 3 (`validation rule`)'s `RULE ·` columns come from the Equivalence classes table's `Rule`
 column — a rule (e.g. `VAL-evidence-001`) is usually proven by several equivalence classes at once
-(a base64-decode-and-magic-bytes rule is exercised by every "wrong format" class), so
-`build-tcm-matrix.py` accumulates every class's cases under its rule and emits one `RULE ·` column
+(a base64-decode-and-magic-bytes rule is exercised by every "wrong format" class), so the generator
+(`make testcases`) accumulates every class's cases under its rule and emits one `RULE ·` column
 per distinct rule rather than one per class. A class with no named rule behind it (a bare
 type/shape check `test_basis.md` never named) leaves `Rule` as `—` and is correctly excluded — it
 was never a member of this dimension's denominator.

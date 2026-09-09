@@ -282,18 +282,18 @@ valid only with a citation proving the OLD expectation was wrong.
 
 ## `tcm.md` template — written by `qa-analyst`, per story
 
-**Coverage Matrix is generated, not hand-typed.** Run
-`make tcm-matrix STORY=docs/test_cases/REQ[ID]_.../US[ID]` (or
-`python3 scripts/tc/build-tcm-matrix.py --story <dir>`) **after** `make testcases` — it reads the
-`design_notes.md` Derivation tables you already wrote (Equivalence classes, Boundary analysis,
-Decision table(s), State transitions, Exception coverage) plus `AC_Ref` from
-`test_cases_index.csv`, and inverts each table's "Cases" column into `tcm_matrix.csv`: one row per
-`Test_Case_ID`, one column per dimension-value, lowercase `x` where that case's own derivation
-cites that value. **This is the same "derived, not chosen" control from
-`.claude/refs/coverage-model.md` #1** — applied to the X-matrix itself: a dimension-value that
-never appears in a Derivation table's "Cases" column cannot silently gain an `x`, and the script
-warns on stderr about any dimension column with zero `x` (a real, visible shortfall — record it in
-`## Spec non-compliance`, don't just delete the column).
+**Coverage Matrix is generated, not hand-typed.** `make testcases` now emits it as the **right-hand
+column block of `test_cases.csv`** (and of `test_cases_index.csv`) — the standalone `tcm_matrix.csv`
+is retired. The generator reads the `design_notes.md` Derivation tables you already wrote
+(Equivalence classes, Boundary analysis, Decision table(s), State transitions, Exception coverage)
+plus `AC_Ref`, and inverts each table's "Cases" column into one column per dimension-value,
+lowercase `x` on every step-row of a case whose derivation cites that value. Cases and their
+X-mapping now share one row and one file — the layout of the team's reference sheet. See
+`.claude/refs/csv-schema.md` for the exact column order and naming. **This is the same "derived, not
+chosen" control from `.claude/refs/coverage-model.md` #1** — applied to the X-matrix itself: a
+dimension-value that never appears in a Derivation table's "Cases" column cannot silently gain an
+`x`, and the script warns on stderr about any dimension column with zero `x` (a real, visible
+shortfall — record it in `## Spec non-compliance`, don't just delete the column).
 
 The Derivation tables must cite cases in their "Cases"/"Case"/"Covered by" column for this to work:
 - Equivalence classes / Boundary analysis: tag each case against the specific class/value it proves
@@ -309,7 +309,8 @@ The Derivation tables must cite cases in their "Cases"/"Case"/"Covered by" colum
 
 **Story:** US[ID] · **Requirement:** REQ[ID]
 **TCM Status:** `draft` | `reconciled`
-**Coverage Matrix:** `tcm_matrix.csv` (generated — see `make tcm-matrix`, do not hand-edit)
+**Coverage Matrix:** the matrix block of `test_cases.csv` — columns `AC ·` … `EXC` right of `Basis_Ref`
+(generated — `make testcases`, do not hand-edit)
 
 ## State & boundary analysis
 
@@ -328,14 +329,14 @@ Enumerate every input, variable, and state BEFORE counting. This is the source t
 | endpoints | | test_basis.md (confirmed rows only) |
 | status_codes | | [list each endpoint's codes] |
 | request_fields | | [list each] |
-| validation_rules | | count of `tcm_matrix.csv`'s `RULE ·` columns (one per distinct `Rule` value in the Equivalence classes table — a rule proven by 5 classes is still 1 column) |
+| validation_rules | | count of `test_cases.csv`'s matrix-block `RULE ·` columns (one per distinct `Rule` value in the Equivalence classes table — a rule proven by 5 classes is still 1 column) |
 | error_codes | | [list each] |
 | db_writes | | [list each] |
 | db_constraints | | [list each — 0 for read-only stories] |
-| boundaries | | count of VALUES in `tcm_matrix.csv`'s `BVA ·` columns — every boundary row's min−1/min/max/max+1 cell, not just the field count |
-| decision_rules | | count of `tcm_matrix.csv`'s `DT (...) ·` columns |
-| transitions | | count of `tcm_matrix.csv`'s `ST ·` columns — includes BOTH `(valid)` and `(invalid — must be rejected)` |
-| exceptions | | count of `tcm_matrix.csv`'s `EXC ...` columns |
+| boundaries | | count of VALUES in `test_cases.csv`'s matrix-block `BVA ·` columns — every boundary row's min−1/min/max/max+1 cell, not just the field count |
+| decision_rules | | count of `test_cases.csv`'s matrix-block `DT (...) ·` columns |
+| transitions | | count of `test_cases.csv`'s matrix-block `ST ·` columns — includes BOTH `(valid)` and `(invalid — must be rejected)` |
+| exceptions | | count of `test_cases.csv`'s matrix-block `EXC ...` columns |
 | screens | | [context only — NOT a term in min_UI] |
 | ui_states | | [per screen, then summed — never max, never average] |
 | ui_interactions | | [list each] |
@@ -363,11 +364,11 @@ there is no multiplication. Write the zeros — a dropped term is invisible, a `
 ## Coverage ratios
 
 Per `.claude/refs/coverage-model.md`. Denominators ratified at G2 on [date]. For every dimension
-except `automation`, Covered/Total = the count of `tcm_matrix.csv` columns of that dimension's
-prefix group that have ≥1 `x` / the count of columns in that group — **count them from the file, do
-not retype a number you didn't just count.**
+except `automation`, Covered/Total = the count of `test_cases.csv` matrix-block columns of that
+dimension's prefix group that have ≥1 `x` / the count of columns in that group — **count them from
+the file, do not retype a number you didn't just count.**
 
-| Dimension | Covered | Total | Ratio | Threshold | Status | `tcm_matrix.csv` group |
+| Dimension | Covered | Total | Ratio | Threshold | Status | matrix group |
 |---|---|---|---|---|---|---|
 | AC | | | | 1.00 | | `AC ·` |
 | endpoint × status | | | | 0.90 | | `END ·` |

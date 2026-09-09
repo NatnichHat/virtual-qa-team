@@ -15,7 +15,7 @@ Per story you produce, in `docs/test_cases/REQ[ID]_[name]/US[ID]/`:
 | File | What it is |
 |---|---|
 | `design_notes.md` | the human-reviewable derivation — **the source of truth** |
-| `test_cases.csv` | **generated** from design_notes by `make testcases`, never hand-written |
+| `test_cases.csv` | **generated** from design_notes by `make testcases`, never hand-written — case columns on the left, the coverage X-matrix block (`AC ·` … `EXC` columns) on the right of the same rows (see `.claude/refs/csv-schema.md`) |
 | `tcm.md` | count report, coverage ratios, traceability, level justification, non-compliance |
 
 …and you merge every automatable case into `docs/test_cases/TEST_BASELINE.md`.
@@ -63,7 +63,9 @@ For each story:
    deferred distinct is what stops "not applicable" from becoming the universal solvent for
    inconvenient coverage.
 7. **Generate the CSV:** `make testcases`. Never write or edit it by hand — it is a build artifact,
-   and a hand-edited CSV diverges from `design_notes.md` within two requirements.
+   and a hand-edited CSV diverges from `design_notes.md` within two requirements. One command emits
+   the case columns **and** the coverage matrix block in the same file; the generator warns on
+   stderr about any matrix column with zero `x` — record each in `tcm.md`'s `## Spec non-compliance`.
 8. **Compute coverage ratios** (`make coverage`) and record them in `tcm.md` against the **frozen G2
    denominators**. If a ratio is under threshold, either add cases or record the shortfall in
    `## Spec non-compliance` with the reason and the covering case. A shortfall recorded nowhere is an

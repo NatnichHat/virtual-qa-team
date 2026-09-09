@@ -65,8 +65,11 @@ virtual-qa-team/
 │   │   ├── TEST_BASELINE.md       ← 1 project = 1 baseline, all levels
 │   │   └── REQ001_<name>/US001/
 │   │       ├── design_notes.md    ← qa-analyst — the reviewable SOURCE
-│   │       ├── test_cases.csv     ← GENERATED (make testcases) — never hand-edited
-│   │       ├── test_cases_index.csv
+│   │       ├── test_cases.csv     ← GENERATED (make testcases) — never hand-edited; cases left,
+│   │       │                          coverage X-matrix block (`AC ·`…`EXC`) right, same rows
+│   │       ├── test_cases_index.csv ← one row per case + the same matrix block
+│   │       ├── test_cases.xlsx    ← PRESENTATION ONLY (make xlsx-view) — gitignored, rendered
+│   │       │                          from the CSVs, never read by a gate/script/agent
 │   │       ├── .expected.lock     ← anti-self-healing snapshot, written at G4
 │   │       ├── tcm.md             ← counts, ratios, traceability, non-compliance
 │   │       ├── coverage.md        ← make coverage
@@ -238,6 +241,9 @@ improving and resets the streak.
 - A case with no `Basis_Ref`. No oracle, no case.
 - A vague `Expected_Result` ("should fail", "error is displayed") — a 500 satisfies both.
 - Hand-editing `test_cases.csv` instead of editing `design_notes.md` and regenerating.
+- Reading or hand-editing `test_cases.xlsx` — it is a gitignored presentation photograph of the
+  CSVs (`make xlsx-view`); a hand-edit there is silently destroyed by the next render and the
+  CSVs remain the only artifact a gate, script, or agent may consume.
 - **Changing an `Expected_Result` to make a failing test pass.** The single worst thing that can
   happen in this pipeline, and a D4 incident. `relaxes` requires a citation proving the OLD
   expectation was wrong; "the system behaves differently" is never that proof.

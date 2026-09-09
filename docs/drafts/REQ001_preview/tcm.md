@@ -4,7 +4,8 @@
 
 **Story:** US001 · **Requirement:** REQ001
 **TCM Status:** `draft`
-**Coverage Matrix:** `tcm_matrix.csv` (generated — `make tcm-matrix STORY=docs/drafts/REQ001_preview`, do not hand-edit)
+**Coverage Matrix:** the matrix block of `test_cases.csv` — columns `AC ·` … `EXC` right of `Basis_Ref`
+(generated — `make testcases STORY=docs/drafts/REQ001_preview`, do not hand-edit)
 
 ## State & boundary analysis
 
@@ -35,7 +36,7 @@ Enumerate every input, variable, and state BEFORE counting. This is the source t
 | error_codes | 2 | 104001 (invalid format); 104010 (size exceeded) |
 | db_writes | 2 | GCS bucket write (SE-evidence-001); tb_dipchip_info write (SE-evidence-004). Non-overwrite guarantees (SE-evidence-002/003) are negative-side-effect assertions. |
 | db_constraints | 0 | read-only verification for AC-2c; no DDL constraints tested |
-| boundaries | 9 | 500,000/500,001 (KB=1000 max/max+1); 512,000/512,001 (KB=1024 max/max+1); truncated base64 (max); presence absent/null/empty/whitespace (min-1/min/max/max+1) — corrected from an earlier manual count of 4 that only included the two size thresholds; `tcm_matrix.csv`'s `BVA ·` columns count every value in the State & boundary analysis table above, per `coverage-model.md` §2 |
+| boundaries | 9 | 500,000/500,001 (KB=1000 max/max+1); 512,000/512,001 (KB=1024 max/max+1); truncated base64 (max); presence absent/null/empty/whitespace (min-1/min/max/max+1) — corrected from an earlier manual count of 4 that only included the two size thresholds; `test_cases.csv`'s matrix-block `BVA ·` columns count every value in the State & boundary analysis table above, per `coverage-model.md` §2 |
 | decision_rules | 5 | R1 (absent → processed without photo); R2 (size > 500KB → 104010); R3 (not decodable → 104001); R4 (wrong format → 104001); R5 (valid → success) |
 | transitions | 12 | 3 valid (0001→0002, 0002→0000, 0002→Failed) + 9 reachable-invalid (full 4×4 matrix minus self-transitions and the 3 valid) |
 | exceptions | 14 | A1, A2, A3, A4, A5, A6, A9, A11, A13, B1, B2, B3, C3, F1 (after 30 documented declines) |
@@ -70,7 +71,7 @@ there is no multiplication. Write the zeros — a dropped term is invisible, a `
 Per `.claude/refs/coverage-model.md`. **Denominators are NOT G2-ratified — these are preview
 estimates for shape review.**
 
-| Dimension | Covered | Total | Ratio | Threshold | Status | `tcm_matrix.csv` group |
+| Dimension | Covered | Total | Ratio | Threshold | Status | matrix group |
 |---|---|---|---|---|---|---|
 | AC | 5 | 5 | 1.00 | 1.00 | PASS | `AC ·` |
 | endpoint × status | 2 | 2 | 1.00 | 0.90 | PASS | `END ·` |
@@ -82,8 +83,8 @@ estimates for shape review.**
 | automation | 32 | 32 | 1.00 | per stack | PASS | _(from test_cases.csv)_ |
 
 **Boundary corrected 4→9:** an earlier manual count only listed the two 500 KB/512 KB size
-thresholds. `tcm_matrix.csv`'s `BVA ·` columns count every value in the State & boundary analysis
-table above, including the truncated-base64 boundary and the four presence values
+thresholds. `test_cases.csv`'s matrix-block `BVA ·` columns count every value in the State &
+boundary analysis table above, including the truncated-base64 boundary and the four presence values
 (absent/null/empty/whitespace) — all still 100% covered, so the ratio and PASS status don't change.
 
 **Endpoint × status and validation rule are now machine-derived too, and both land exactly on the
@@ -107,23 +108,23 @@ denominators will be ratified after G0 confirmation.
 
 ## Coverage Matrix
 
-`tcm_matrix.csv` (32 test cases × 67 dimension columns) replaces the narrative AC → traceability
-table this section used to carry by hand. It is generated — never hand-edited — by
-`scripts/tc/build-tcm-matrix.py`, which inverts the "Cases" columns already present in this file's
-Derivation tables (Equivalence classes, Boundary analysis, Decision table, State transitions,
-Exception coverage) plus `AC_Ref` from `test_cases_index.csv` into one dimension-value per column,
-one `Test_Case_ID` per row, lowercase `x` where that case's own derivation cites that value.
+The matrix block of `test_cases.csv` (32 test cases × 67 dimension columns, right of `Basis_Ref`)
+replaces both the narrative AC → traceability table this section used to carry by hand **and** the
+retired standalone `tcm_matrix.csv` — cases and their X-mapping now share one file and one row, the
+layout of the team's reference sheet. It is generated — never hand-edited — by `make testcases`,
+which inverts the "Cases" columns already present in `design_notes.md`'s Derivation tables
+(Equivalence classes, Boundary analysis, Decision table, State transitions, Exception coverage)
+plus `AC_Ref` into one dimension-value per column, lowercase `x` on every step-row of a case whose
+own derivation cites that value.
 
-Regenerate after any change to `design_notes.md` or `test_cases.csv`:
+Regenerate after any change to `design_notes.md`:
 
 ```
-python3 scripts/tc/build-csv.py --story docs/drafts/REQ001_preview   # test_cases.csv first
-make tcm-matrix STORY=docs/drafts/REQ001_preview                     # then tcm_matrix.csv
+make testcases STORY=docs/drafts/REQ001_preview    # cases + matrix block in one pass
 ```
 
 (`make testcases` with no `STORY=` also works once this story moves under `docs/test_cases/` — it
-walks every story directory there. It has no `STORY=` argument itself; use `--story` directly, or
-`make tcm-matrix STORY=<dir>` which does support it, for a single draft directory like this one.)
+walks every story directory there.)
 
 Column groups, by prefix: `AC ·` (5 — acceptance criteria), `END ·` (2 — endpoint × status pairs,
 excludes `[verification]` steps and `exception`-type cases), `RULE ·` (3 — named validation rules
@@ -131,7 +132,7 @@ from `test_basis.md`), `EP ·` (17 — equivalence classes, derivation detail; n
 `coverage-model.md` dimensions on its own), `BVA ·` (9 — boundary values),
 `DT (evidencePhoto validation outcome) ·` (5 — decision rules), `ST ·` (12 — state transitions,
 both valid and invalid), `EXC ...` (14 — exception catalog rows). Every dimension column had ≥1 `x`
-when this was generated (`build-tcm-matrix` warns on stderr otherwise), with two known exceptions:
+when this was generated (`make testcases` warns on stderr otherwise), with two known exceptions:
 the 9 `ST ·` `(invalid — must be rejected)` columns, which are the correct, visible representation
 of the 9 reachable-invalid transitions recorded as deferred in `## Spec non-compliance` below; and
 one `EP · x-devops-key header = valid DevOps API key` column, which has zero `x` because no case

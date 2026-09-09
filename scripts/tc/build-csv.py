@@ -7,8 +7,11 @@ what always happens to duplicated state. `make testcases-check` regenerates to a
 diffs, so a hand-edited CSV fails the gate.
 
 Emits, per story directory:
-  test_cases.csv        one row per STEP, case-level fields repeated (filterable in Excel)
-  test_cases_index.csv  one row per CASE, for counting and reporting
+  test_cases.csv        one row per STEP, case-level fields repeated (filterable in Excel),
+                        followed by the coverage X-matrix block (`AC ·` … `EXC` columns) on the
+                        same rows — the layout of the team's reference sheet. The standalone
+                        tcm_matrix.csv is retired; see .claude/refs/csv-schema.md.
+  test_cases_index.csv  one row per CASE + the same matrix block, for counting and reporting
 
 Encoding is utf-8-sig on purpose: without the BOM, Excel on Windows renders Thai as mojibake,
 which is the single most common way this deliverable arrives broken.
@@ -25,14 +28,25 @@ import os
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import matrix  # noqa: E402 — the X-matrix column deriver (shared with nothing else; kept separate
+                # so the parsing of cases and the inversion of derivations stay independently readable)
+
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TEST_CASES_ROOT = os.path.join(REPO_ROOT, "docs", "test_cases")
 
+# Case-block order follows the reference sheet's row 1 (No TC. → Data Prep → Test Description →
+# Test Step → Test Expected → Test Result → Automate → Positive/Negative → Defect Link → Remark);
+# schema columns the reference sheet has no counterpart for are appended after it, before the
+# matrix block. See .claude/refs/csv-schema.md for the full mapping.
 COLUMNS = [
-    "Test_Case_ID", "REQ_ID", "US_ID", "AC_Ref", "Test_Level", "Test_Type",
-    "Design_Technique", "Priority", "Test_Description", "Preconditions", "Test_Data",
-    "Step_No", "Test_Step", "Expected_Result", "Postcondition", "Automatable",
-    "Automation_ID", "Env_Scope", "Basis_Ref", "Status", "Defect_ID", "Notes",
+    # reference-sheet order
+    "Test_Case_ID", "Preconditions", "Test_Data", "Test_Description",
+    "Step_No", "Test_Step", "Expected_Result", "Status",
+    "Automatable", "Automation_ID", "Test_Type", "Defect_ID", "Notes",
+    # appended — no reference-sheet counterpart
+    "REQ_ID", "US_ID", "AC_Ref", "Test_Level", "Design_Technique", "Priority",
+    "Postcondition", "Env_Scope", "Basis_Ref",
 ]
 INDEX_COLUMNS = [c for c in COLUMNS if c not in ("Step_No", "Test_Step", "Expected_Result")]
 
@@ -195,14 +209,14 @@ def rows_for(cases, source):
     return rows
 
 
-def index_rows(rows):
+def index_rows(rows, index_columns):
     seen, out = set(), []
     for row in rows:
         cid = row["Test_Case_ID"]
         if cid in seen:
             continue
         seen.add(cid)
-        out.append({c: row.get(c, "") for c in INDEX_COLUMNS})
+        out.append({c: row.get(c, "") for c in index_columns})
     return out
 
 
@@ -213,6 +227,34 @@ def render(rows, columns):
     writer.writeheader()
     writer.writerows(rows)
     return buf.getvalue()
+
+
+def with_matrix(rows, design_notes_path):
+    """Append the coverage X-matrix block to `rows` in place and return (matrix_names, warnings).
+
+    One file, two blocks — the reference sheet's layout: case columns left, dimension columns
+    right of the same row. Matrix columns are case-level, so every step-row of a case carries the
+    same `x` pattern (coverage counts columns with >=1 `x`, so the repetition never inflates a
+    ratio). Replaces the retired standalone tcm_matrix.csv.
+    """
+    case_ids, seen = [], set()
+    for row in rows:
+        cid = row["Test_Case_ID"]
+        if cid not in seen:
+            seen.add(cid)
+            case_ids.append(cid)
+
+    with open(design_notes_path, encoding="utf-8") as fh:
+        lines = fh.readlines()
+    columns, warnings = matrix.build_columns(lines, case_ids, rows)
+
+    names = [name for name, _ in columns]
+    marks = {name: set(ids) for name, ids in columns}
+    for row in rows:
+        cid = row["Test_Case_ID"]
+        for name in names:
+            row[name] = "x" if cid in marks[name] else ""
+    return names, warnings
 
 
 def story_dirs(only=None):
@@ -243,7 +285,7 @@ def main():
         print("build-csv: no story directories with design_notes.md found — nothing to do")
         return 0
 
-    drift, errors = [], []
+    drift, errors, all_warnings = [], [], []
     for story in dirs:
         src = os.path.join(story, "design_notes.md")
         try:
@@ -257,9 +299,15 @@ def main():
             errors.append(f"{src}: parsed 0 test cases — check the `## Test cases` section format")
             continue
 
-        for name, payload in (
-            ("test_cases.csv", render(rows, COLUMNS)),
-            ("test_cases_index.csv", render(index_rows(rows), INDEX_COLUMNS)),
+        matrix_names, warnings = with_matrix(rows, src)
+        all_warnings += [(os.path.relpath(story, REPO_ROOT), w) for w in warnings]
+        columns = COLUMNS + matrix_names
+        idx_columns = INDEX_COLUMNS + matrix_names
+        idx_rows = index_rows(rows, idx_columns)
+
+        for name, payload, nrows in (
+            ("test_cases.csv", render(rows, columns), len(rows)),
+            ("test_cases_index.csv", render(idx_rows, idx_columns), len(idx_rows)),
         ):
             dest = os.path.join(story, name)
             if args.check:
@@ -273,12 +321,21 @@ def main():
                 with open(dest, "w", encoding="utf-8-sig", newline="") as fh:
                     fh.write(payload)
                 rel = os.path.relpath(dest, REPO_ROOT)
-                print(f"build-csv: wrote {rel} ({len(rows) if name.endswith('cases.csv') else len(index_rows(rows))} rows)")
+                suffix = f" + {len(matrix_names)} matrix columns" if matrix_names else ""
+                print(f"build-csv: wrote {rel} ({nrows} rows{suffix})")
 
     if errors:
         for e in errors:
             print(f"build-csv: ERROR {e}", file=sys.stderr)
         return 2
+
+    if all_warnings:
+        print("build-csv: WARNING — matrix columns with zero 'x' (uncovered dimension-values):",
+              file=sys.stderr)
+        for story_rel, w in all_warnings:
+            print(f"  {story_rel}: {w}", file=sys.stderr)
+        print("  Record each in tcm.md's `## Spec non-compliance` — never delete the column.",
+              file=sys.stderr)
 
     if args.check:
         if drift:

@@ -1,4 +1,4 @@
-.PHONY: help validate coverage testcases testcases-check tcm-matrix expected-lock expected-drift gate gate-scripts gate-artifacts \
+.PHONY: help validate coverage testcases testcases-check xlsx-view xlsx-preview xlsx-deps expected-lock expected-drift gate gate-scripts gate-artifacts \
         e2e-deps e2e-seed e2e-seed-down e2e-run e2e-dryrun e2e-up e2e-down start-local baseline baseline-check
 
 # ENV selects the target for anything that talks to a running system.
@@ -9,9 +9,11 @@ INCLUDE ?=
 
 help:
 	@echo "Artifacts"
-	@echo "  make testcases        generate test_cases.csv from design_notes.md"
+	@echo "  make testcases        generate test_cases.csv (cases + coverage X-matrix block) from design_notes.md; STORY=<dir>"
 	@echo "  make testcases-check  fail if a CSV was hand-edited (drift guard)"
-	@echo "  make tcm-matrix       generate tcm_matrix.csv (X-mapping) from design_notes.md; STORY=<dir>"
+	@echo "  make xlsx-view        render test_cases.xlsx (presentation: merge+colour) FROM the CSVs; gitignored; STORY=<dir>"
+	@echo "  make xlsx-preview     ALSO render the colour-scope comparison workbook (pick cell_tint/row_tint/banding in Excel, set scripts/tc/xlsx_style.toml)"
+	@echo "  make xlsx-deps        one-time install of the tooling deps (scripts/requirements.txt → openpyxl)"
 	@echo "  make validate         artifact validator — the pre-check behind every human gate"
 	@echo "  make coverage         specification coverage against the G2-ratified denominators"
 	@echo "  make expected-lock    snapshot approved expected results (G4 approval only)"
@@ -31,16 +33,38 @@ help:
 	@echo "  make e2e-seed-down    remove seeded fixtures (the sit/uat-safe teardown)"
 
 # ── Artifacts ──────────────────────────────────────────────────────────────
+# test_cases.csv is one file with two blocks: the case columns (left) and the wide X-mapping
+# Coverage Matrix (right — `AC ·` … `EXC` columns), derived from design_notes.md's Derivation
+# tables (never hand-typed — see .claude/refs/csv-schema.md and coverage-model.md). The retired
+# `tcm-matrix` target's standalone tcm_matrix.csv is now this matrix block. STORY=<dir> is
+# optional; without it every story under docs/test_cases/ is built.
 testcases:
-	@python3 scripts/tc/build-csv.py
+	@python3 scripts/tc/build-csv.py $(if $(STORY),--story $(STORY),)
 
 testcases-check:
-	@python3 scripts/tc/build-csv.py --check
+	@python3 scripts/tc/build-csv.py --check $(if $(STORY),--story $(STORY),)
 
-# tcm_matrix.csv is the wide X-mapping Coverage Matrix, derived from design_notes.md's Derivation
-# tables (never hand-typed — see .claude/refs/coverage-model.md). STORY=docs/test_cases/REQ.../US...
-tcm-matrix:
-	@python3 scripts/tc/build-tcm-matrix.py --story $(STORY)
+# Presentation view: test_cases.xlsx (merge cells + colour) rendered FROM the CSVs, for humans
+# opening Excel — never read by a gate, script, or agent (those read the token-cheap CSVs).
+# Gitignored on purpose: an xlsx is a zip embedding timestamps, so committing it would trip
+# byte-diff guards on identical content. The CSVs are the truth; this is a photograph of them.
+xlsx-view:
+	@$(XLSX_PY) scripts/tc/build-xlsx.py $(if $(STORY),--story $(STORY),)
+
+# Colour-scope decision aid: renders xlsx_style_preview.xlsx beside test_cases.xlsx — the same
+# small automatic case subset under all three scopes (cell_tint / row_tint / banding), one sheet
+# each. Open it in Excel, pick, set color_scope in scripts/tc/xlsx_style.toml, re-run xlsx-view.
+xlsx-preview:
+	@$(XLSX_PY) scripts/tc/build-xlsx.py --preview $(if $(STORY),--story $(STORY),)
+
+# One-time provisioning for the tooling scripts — same tier as e2e-deps, deliberately NOT
+# auto-invoked by xlsx-view. Tooling deps live in scripts/requirements.txt, separate from the
+# Robot runner's tests/e2e/requirements.txt. Installs into a project-local venv (.venv/tools,
+# gitignored) rather than the system site-packages: PEP 668 guards Homebrew/Debian Python
+# against exactly that, and this repo never silently overrides the guard (deps.sh precedent).
+XLSX_PY := $(if $(wildcard .venv/tools/bin/python3),.venv/tools/bin/python3,python3)
+xlsx-deps:
+	@python3 -m venv .venv/tools && .venv/tools/bin/python3 -m pip install --quiet -r scripts/requirements.txt && echo "xlsx-deps: openpyxl installed into .venv/tools — make xlsx-view will use it"
 
 validate:
 	@python3 scripts/gate/validate-artifacts.py

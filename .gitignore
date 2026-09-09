@@ -42,6 +42,14 @@ tests/e2e/config/auth/.env.*
 /report.html
 /playwright-log.txt
 
+# Presentation views rendered from the CSVs by `make xlsx-view` — see .claude/refs/csv-schema.md.
+# Gitignored on purpose: an xlsx is a ZIP embedding timestamps, so committing it would make the
+# byte-diff drift guards fire on identical content, and produce binary diffs nobody can review.
+# The CSVs (test_cases.csv / test_cases_index.csv) are the tracked source of truth; the xlsx is
+# a downstream photograph, regenerated on demand. Ignored by extension, anywhere, so a stray
+# copy outside docs/ is caught too.
+*.xlsx
+
 # Triage evidence captures (screenshots, response snapshots, curl transcripts).
 # The triage.md verdict IS tracked — the raw megabytes it cites are not.
 /docs/defects/*/artifacts/
